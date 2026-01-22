@@ -7,7 +7,19 @@ const path = require('path');
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
+// ========== نظام الرتب ==========
+const ROLES = {
+  OWNER: 'owner',      // 🏆 المالك
+  MINISTER: 'minister', // 👑 الوزير
+  MEMBER: 'member'     // 👤 عضو
+};
 
+// صلاحيات كل رتبة
+const PERMISSIONS = {
+  [ROLES.OWNER]: ['mute', 'unmute', 'promote', 'demote', 'kick'],
+  [ROLES.MINISTER]: ['mute', 'unmute'],
+  [ROLES.MEMBER]: []
+};
 // ========== إعدادات الملفات ==========
 const users = {};
 const messageHistory = [];
@@ -44,25 +56,40 @@ io.on('connection', (socket) => {
   console.log('✅ مستخدم جديد متصل:', socket.id);
   
   // ======== 1. تسجيل المستخدم ========
-  socket.on('register user', (userData) => {
-    const userId = socket.id;
-    const newUser = {
-      id: userId,
-      username: userData.username || 'زائر',
-      avatar: userData.avatar || '👤',
-      avatarImage: userData.avatarImage || null,
-      status: 'online',
-      joinTime: new Date().toLocaleTimeString('ar-SA'),
-      isMuted: false
-    };
-    
+ socket.on('register user', (userData) => {
+  const userId = socket.id;
+  
+  // تحديد الرتبة
+  let role = ROLES.MEMBER;
+  let isOwner = false;
+  
+  // إذا كان اسم "المالك" أو "Admin" فهو المالك
+  if (userData.username === 'المالك' || userData.username === 'Admin' || userData.username === 'admin') {
+    role = ROLES.OWNER;
+    isOwner = true;
+  }
+  
+  const newUser = {
+    id: userId,
+    username: userData.username || 'زائر',
+    avatar: userData.avatar || '👤',
+    avatarImage: userData.avatarImage || null,
+    role: role,                    // ← أضفنا الرتبة
+    isOwner: isOwner,              // ← أضفنا isOwner
+    promotedBy: null,              // ← أضفنا promotedBy
+    status: 'online',
+    joinTime: new Date().toLocaleTimeString('ar-SA'),
+    isMuted: false
+   };
+  
     users[userId] = newUser;
     
     // إرسال ترحيب
     socket.emit('welcome', {
       message: `مرحباً ${newUser.username}!`,
       users: Object.values(users),
-      history: messageHistory.slice(-50)
+      history: messageHistory.slice(-50),
+      yourRole: role
     });
     
     // إعلام الجميع بمستخدم جديد
@@ -81,7 +108,58 @@ io.on('connection', (socket) => {
       socket.emit('avatar updated', true);
     }
   });
+    // ======== 13. ترقية مستخدم لوزير ========
+  socket.on('promote to minister', (targetUserId) => {
+    const user = users[socket.id];
+    const targetUser = users[targetUserId];
+    
+    // فقط المالك يقدر يرقّي
+    if (!user || user.role !== ROLES.OWNER) {
+      socket.emit('error', '❌ فقط المالك يمكنه الترقية!');
+      return;
+    }
+    
+    if (targetUser && targetUser.role === ROLES.MEMBER) {
+      targetUser.role = ROLES.MINISTER;
+      targetUser.promotedBy = user.username;
+      
+      io.emit('user promoted', {
+        userId: targetUserId,
+        username: targetUser.username,
+        promotedBy: user.username,
+        newRole: 'الوزير 👑'
+      });
+      
+      io.emit('users update', Object.values(users));
+      console.log(`👑 ${user.username} رقّى ${targetUser.username} لوزير`);
+    }
+  });
   
+  // ======== 14. خفض وزير لعضو ========
+  socket.on('demote minister', (targetUserId) => {
+    const user = users[socket.id];
+    const targetUser = users[targetUserId];
+    
+    // فقط المالك يقدر يخفض
+    if (!user || user.role !== ROLES.OWNER) {
+      socket.emit('error', '❌ فقط المالك يمكنه خفض الرتبة!');
+      return;
+    }
+    
+    if (targetUser && targetUser.role === ROLES.MINISTER) {
+      targetUser.role = ROLES.MEMBER;
+      targetUser.promotedBy = null;
+      
+      io.emit('user demoted', {
+        userId: targetUserId,
+        username: targetUser.username,
+        demotedBy: user.username
+      });
+      
+      io.emit('users update', Object.values(users));
+      console.log(`⬇️ ${user.username} خفض ${targetUser.username} لعضو`);
+    }
+  });
   // ======== 3. إرسال رسالة نصية ========
   socket.on('send message', (msgData) => {
     const user = users[socket.id];
@@ -236,24 +314,53 @@ io.on('connection', (socket) => {
   // ======== 8. كتم مستخدم ========
   socket.on('mute user', (targetUserId) => {
     const user = users[socket.id];
-    if (user && users[targetUserId]) {
-      users[targetUserId].isMuted = true;
-      io.emit('user muted', {
-        userId: targetUserId,
-        mutedBy: user.username
-      });
+    const targetUser = users[targetUserId];
+    
+    if (!user || !targetUser) return;
+    
+    // لا يمكن كتم المالك
+    if (targetUser.isOwner) {
+      socket.emit('error', '❌ لا يمكن كتم المالك!');
+      return;
     }
+    
+    // التحقق من الصلاحيات
+    if (!PERMISSIONS[user.role]?.includes('mute')) {
+      socket.emit('error', '❌ ليس لديك صلاحية الكتم!');
+      return;
+    }
+    
+    // لا يمكن كتم أعلى رتبة
+    if (user.role === ROLES.MINISTER && targetUser.role === ROLES.MINISTER) {
+      socket.emit('error', '❌ لا يمكن كتم وزير آخر!');
+      return;
+    }
+    
+    targetUser.isMuted = true;
+    io.emit('user muted', {
+      userId: targetUserId,
+      mutedBy: user.username,
+      role: user.role
+    });
   });
   
-  // ======== 9. إلغاء كتم مستخدم ========
+   // ======== 9. إلغاء كتم مستخدم ========
   socket.on('unmute user', (targetUserId) => {
     const user = users[socket.id];
-    if (user && users[targetUserId]) {
-      users[targetUserId].isMuted = false;
-      io.emit('user unmuted', targetUserId);
+    const targetUser = users[targetUserId];
+    
+    if (!user || !targetUser) return;
+    
+    // التحقق من الصلاحيات
+    if (!PERMISSIONS[user.role]?.includes('unmute')) {
+      socket.emit('error', '❌ ليس لديك صلاحية إلغاء الكتم!');
+      return;
     }
+    
+    targetUser.isMuted = false;
+    io.emit('user unmuted', targetUserId);
   });
-  
+
   // ======== 10. مؤشر الكتابة ========
   socket.on('typing', () => {
     const user = users[socket.id];
