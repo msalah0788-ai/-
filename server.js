@@ -13,6 +13,22 @@ const ROLES = {
   MINISTER: 'minister', // 👑 الوزير
   MEMBER: 'member'     // 👤 عضو
 };
+// ========== النظام المتقدم ==========
+const advancedUsers = new Map();
+const privateMessages = new Map();
+const emojiStore = new Map();
+const gifStore = new Map();
+
+// حساب المالك الجاهز
+const PREMIUM_ACCOUNTS = {
+  'محمد': {
+    password: 'aumsalah079',
+    role: 'owner',
+    gender: 'ذكر',
+    zodiac: 'الحمل',
+    joinDate: new Date().toLocaleDateString('ar-SA')
+  }
+};
 
 // صلاحيات كل رتبة
 const PERMISSIONS = {
@@ -58,6 +74,82 @@ io.on('connection', (socket) => {
   // ======== 1. تسجيل المستخدم ========
  socket.on('register user', (userData) => {
   const userId = socket.id;
+  
+  // التحقق من الاسم المكرر
+  const existingUser = Object.values(users).find(u => 
+    u.username.toLowerCase() === userData.username.toLowerCase()
+  );
+  
+  if (existingUser && !userData.isGuest) {
+    socket.emit('error', '⚠️ هذا الاسم مستخدم مسبقاً');
+    return;
+  }
+  
+  // تحديد الرتبة
+  let role = ROLES.MEMBER;
+  let isOwner = false;
+  let isGuest = userData.isGuest || false;
+  
+  // تسجيل بحساب مسبق
+  if (userData.password) {
+    if (PREMIUM_ACCOUNTS[userData.username]) {
+      if (PREMIUM_ACCOUNTS[userData.username].password === userData.password) {
+        role = PREMIUM_ACCOUNTS[userData.username].role;
+        isOwner = (role === ROLES.OWNER);
+      } else {
+        socket.emit('error', '❌ كلمة السر غير صحيحة');
+        return;
+      }
+    }
+  }
+  // تسجيل زائر باسم "المالك"
+  else if (userData.username === 'المالك' && isGuest) {
+    role = ROLES.MINISTER;
+    socket.emit('info', '👑 أنت وزير. للحصول على صلاحيات المالك، سجل بحساب.');
+  }
+  
+  const newUser = {
+    id: userId,
+    username: userData.username,
+    avatar: userData.avatar || '👤',
+    avatarImage: userData.avatarImage,
+    role: role,
+    isOwner: isOwner,
+    isGuest: isGuest,
+    promotedBy: null,
+    gender: userData.gender || 'غير محدد',
+    zodiac: userData.zodiac || 'غير محدد',
+    joinDate: new Date().toLocaleDateString('ar-SA'),
+    status: 'online',
+    isMuted: false,
+    privateWith: null
+  };
+  
+  users[userId] = newUser;
+  
+  // حفظ الحساب المتقدم
+  if (!isGuest && userData.password) {
+    advancedUsers.set(userData.username, {
+      password: userData.password,
+      userId: userId,
+      data: newUser
+    });
+  }
+  
+  // إرسال ترحيب
+  socket.emit('welcome', {
+    message: `مرحباً ${newUser.username}!`,
+    users: Object.values(users),
+    history: messageHistory.slice(-50),
+    yourRole: role
+  });
+  
+  // إعلام الجميع
+  socket.broadcast.emit('user joined', newUser);
+  io.emit('users update', Object.values(users));
+  
+  console.log(`✅ ${newUser.username} (${role}) انضم`);
+});
   
   // تحديد الرتبة
   let role = ROLES.MEMBER;
@@ -389,6 +481,66 @@ io.on('connection', (socket) => {
     }
   });
 });
+  // ======== 15. إضافة إيموجي ========
+  socket.on('add emoji', (emojiData) => {
+    const user = users[socket.id];
+    if (!user || (user.role !== ROLES.OWNER && user.role !== ROLES.MINISTER)) return;
+    
+    emojiStore.set(emojiData.id, {
+      ...emojiData,
+      addedBy: user.username,
+      timestamp: Date.now()
+    });
+    
+    io.emit('emoji added', emojiData);
+  });
+  
+  // ======== 16. حذف إيموجي ========
+  socket.on('remove emoji', (emojiId) => {
+    const user = users[socket.id];
+    if (!user || (user.role !== ROLES.OWNER && user.role !== ROLES.MINISTER)) return;
+    
+    emojiStore.delete(emojiId);
+    io.emit('emoji removed', emojiId);
+  });
+  
+  // ======== 17. مراسلة خاصة ========
+  socket.on('start private chat', (targetUserId) => {
+    const user = users[socket.id];
+    const targetUser = users[targetUserId];
+    
+    if (!user || !targetUser) return;
+    
+    const roomId = `private_${[socket.id, targetUserId].sort().join('_')}`;
+    
+    socket.join(roomId);
+    socket.to(targetUserId).emit('private chat request', {
+      from: user.username,
+      fromId: socket.id,
+      roomId: roomId
+    });
+    
+    user.privateWith = targetUserId;
+    targetUser.privateWith = socket.id;
+  });
+  
+  // ======== 18. حذف رسالة ========
+  socket.on('delete message', (messageId, targetUserId = null) => {
+    const user = users[socket.id];
+    if (!user) return;
+    
+    // المالك يحذف أي رسالة
+    if (user.role === ROLES.OWNER) {
+      io.emit('message deleted', { messageId, deletedBy: user.username });
+    }
+    // الوزير يحذف رسائل الأعضاء فقط
+    else if (user.role === ROLES.MINISTER && targetUserId) {
+      const targetUser = users[targetUserId];
+      if (targetUser && targetUser.role === ROLES.MEMBER) {
+        io.emit('message deleted', { messageId, deletedBy: user.username });
+      }
+    }
+  });
 
 // ========== تشغيل السيرفر ==========
 const PORT = process.env.PORT || 10000;
