@@ -21,13 +21,7 @@ const ROLES = {
 };
 
 const PREMIUM_ACCOUNTS = {
-    'المالك': {
-        password: 'admin123',
-        role: 'owner',
-        gender: 'ذكر',
-        zodiac: 'غير محدد',
-        joinDate: new Date().toLocaleDateString('ar-SA')
-    },
+   
     'محمد': {
         password: 'aumsalah079',
         role: 'owner',
@@ -47,21 +41,14 @@ const PERMISSIONS = {
 const users = {};
 const messageHistory = [];
 const voiceMessages = new Map();
-const advancedUsers = new Map();
-const privateMessages = new Map();
 
 // ========== إعداد الملفات الثابتة ==========
 app.use(express.static(path.join(__dirname, 'public')));
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// إنشاء المجلدات إذا لم تكن موجودة
-const dirs = ['public', 'public/uploads', 'uploads'];
-dirs.forEach(dir => {
-    const dirPath = path.join(__dirname, dir);
-    if (!fs.existsSync(dirPath)) {
-        fs.mkdirSync(dirPath, { recursive: true });
-    }
-});
+// إنشاء مجلد uploads إذا لم يكن موجوداً
+if (!fs.existsSync(path.join(__dirname, 'uploads'))) {
+    fs.mkdirSync(path.join(__dirname, 'uploads'), { recursive: true });
+}
 
 // ========== الروتس ==========
 app.get('/', (req, res) => {
@@ -77,7 +64,6 @@ app.get('/status', (req, res) => {
     });
 });
 
-// صفحة 404
 app.use((req, res) => {
     res.status(404).send('<h1>404 - الصفحة غير موجودة</h1>');
 });
@@ -144,21 +130,11 @@ io.on('connection', (socket) => {
             joinDate: new Date().toLocaleDateString('ar-SA'),
             status: 'online',
             isMuted: false,
-            privateWith: null,
             joinTime: new Date().toLocaleTimeString('ar-SA'),
             socketId: socket.id
         };
         
         users[userId] = newUser;
-        
-        // حفظ الحساب المتقدم
-        if (!isGuest && userData.password && userData.username !== 'المالك') {
-            advancedUsers.set(userData.username, {
-                password: userData.password,
-                userId: userId,
-                data: newUser
-            });
-        }
         
         // إرسال ترحيب
         socket.emit('welcome', {
@@ -239,7 +215,7 @@ io.on('connection', (socket) => {
         // إشعار صوتي
         socket.broadcast.emit('play sound', 'message');
         
-        console.log(`💬 ${user.username}: ${msgData.text}`);
+        console.log(`💬 ${user.username}: ${msgData.text || '(بدون نص)'}`);
     });
     
     // ======== 4. إرسال ملف (صورة/فيديو) ========
@@ -403,12 +379,6 @@ io.on('connection', (socket) => {
         
         targetUser.isMuted = true;
         
-        // إرسال إشعار للمستخدم المكتم
-        socket.to(targetUserId).emit('user muted notification', {
-            mutedBy: user.username,
-            duration: 'غير محدد'
-        });
-        
         io.emit('user muted', {
             userId: targetUserId,
             username: targetUser.username,
@@ -442,9 +412,6 @@ io.on('connection', (socket) => {
         }
         
         targetUser.isMuted = false;
-        
-        // إرسال إشعار للمستخدم
-        socket.to(targetUserId).emit('user unmuted notification');
         
         io.emit('user unmuted', {
             userId: targetUserId,
@@ -531,12 +498,6 @@ io.on('connection', (socket) => {
                 newRole: 'minister'
             });
             
-            // إرسال إشعار للمستخدم المرفوع
-            socket.to(targetUserId).emit('promotion notification', {
-                promotedBy: user.username,
-                newRole: 'الوزير'
-            });
-            
             io.emit('users update', Object.values(users));
             
             // رسالة نظام
@@ -576,11 +537,6 @@ io.on('connection', (socket) => {
                 username: targetUser.username,
                 demotedBy: user.username,
                 newRole: 'member'
-            });
-            
-            // إرسال إشعار للمستخدم المخفض
-            socket.to(targetUserId).emit('demotion notification', {
-                demotedBy: user.username
             });
             
             io.emit('users update', Object.values(users));
@@ -628,19 +584,7 @@ io.on('connection', (socket) => {
         }
     });
     
-    // ======== 15. طلب تصريح ========
-    socket.on('request permissions', () => {
-        const user = users[socket.id];
-        if (user) {
-            socket.emit('permissions granted', {
-                role: user.role,
-                permissions: PERMISSIONS[user.role] || [],
-                isOwner: user.role === ROLES.OWNER
-            });
-        }
-    });
-    
-    // ======== 16. عند قطع الاتصال ========
+    // ======== 15. عند قطع الاتصال ========
     socket.on('disconnect', () => {
         const user = users[socket.id];
         if (user) {
