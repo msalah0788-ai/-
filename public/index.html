@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🇸🇦 شات عربي - دردشة مجانية</title>
+    <title>🇸🇦 شات عربي متكامل - دردشة، صور، صوت</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
@@ -12,6 +12,7 @@
             --light: #f8f9fa;
             --dark: #343a40;
             --warning: #ff9800;
+            --danger: #dc3545;
         }
         
         * {
@@ -31,7 +32,7 @@
         }
         
         /* نافذة تسجيل الدخول */
-        .login-modal {
+        .modal {
             position: fixed;
             top: 0;
             left: 0;
@@ -44,20 +45,22 @@
             z-index: 1000;
         }
         
-        .login-box {
+        .modal-content {
             background: white;
             padding: 30px;
             border-radius: 15px;
-            width: 400px;
+            width: 90%;
+            max-width: 400px;
             text-align: center;
             box-shadow: 0 10px 30px rgba(0,0,0,0.3);
         }
         
-        .login-box h2 {
+        .modal-content h2, .modal-content h3 {
             color: var(--primary);
             margin-bottom: 20px;
         }
         
+        /* أزرار الصور الشخصية */
         .avatar-options {
             display: flex;
             justify-content: center;
@@ -67,11 +70,15 @@
         }
         
         .avatar-option {
-            font-size: 30px;
-            cursor: pointer;
-            padding: 10px;
-            border: 3px solid transparent;
+            width: 50px;
+            height: 50px;
             border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            cursor: pointer;
+            border: 3px solid transparent;
             transition: all 0.3s;
             background: #f8f9fa;
         }
@@ -85,14 +92,21 @@
             background: #e8f5e9;
         }
         
-        input[type="text"] {
+        .avatar-option img {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+        
+        /* المدخلات */
+        input[type="text"], input[type="file"] {
             width: 100%;
             padding: 12px 15px;
             margin: 10px 0;
             border: 2px solid #ddd;
             border-radius: 10px;
             font-size: 16px;
-            text-align: center;
         }
         
         input[type="text"]:focus {
@@ -100,16 +114,21 @@
             border-color: var(--primary);
         }
         
+        /* الأزرار */
         button {
             background: linear-gradient(90deg, var(--primary), var(--secondary));
             color: white;
             border: none;
-            padding: 12px 25px;
+            padding: 12px 20px;
             border-radius: 10px;
             font-size: 16px;
             cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
+            transition: all 0.3s;
             margin: 5px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
         }
         
         button:hover {
@@ -117,17 +136,31 @@
             box-shadow: 0 5px 15px rgba(46, 125, 50, 0.3);
         }
         
+        button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        button.danger {
+            background: linear-gradient(90deg, #dc3545, #c82333);
+        }
+        
+        button.warning {
+            background: linear-gradient(90deg, #ff9800, #f57c00);
+        }
+        
         /* واجهة الشات */
         .chat-app {
             width: 100%;
-            max-width: 1000px;
+            max-width: 1200px;
             background: white;
             border-radius: 20px;
             box-shadow: 0 15px 35px rgba(0,0,0,0.2);
             overflow: hidden;
             display: flex;
             flex-direction: column;
-            height: 90vh;
+            height: 95vh;
         }
         
         .header {
@@ -135,6 +168,7 @@
             color: white;
             padding: 20px;
             text-align: center;
+            position: relative;
         }
         
         .header h1 {
@@ -147,77 +181,191 @@
             font-size: 14px;
         }
         
+        .user-profile {
+            position: absolute;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(255,255,255,0.2);
+            padding: 8px 15px;
+            border-radius: 50px;
+            cursor: pointer;
+        }
+        
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            overflow: hidden;
+        }
+        
+        .user-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        /* الإحصائيات */
         .stats {
             background: #e8f5e9;
             padding: 10px 20px;
             display: flex;
             justify-content: space-between;
+            align-items: center;
             border-bottom: 1px solid #c8e6c9;
             color: var(--primary);
             font-weight: bold;
         }
         
+        .stats div {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        /* المحتوى الرئيسي */
         .main-content {
             display: flex;
             flex: 1;
             overflow: hidden;
         }
         
-        .users-sidebar {
-            width: 250px;
+        /* الشريط الجانبي */
+        .sidebar {
+            width: 300px;
             background: #f8f9fa;
             border-left: 1px solid #dee2e6;
             padding: 15px;
             overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
         }
         
-        .users-sidebar h3 {
+        .sidebar-section {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid #dee2e6;
+        }
+        
+        .sidebar-section h3 {
             color: var(--primary);
             margin-bottom: 15px;
             padding-bottom: 10px;
-            border-bottom: 2px solid var(--secondary);
-        }
-        
-        #usersList {
-            list-style: none;
-        }
-        
-        #usersList li {
-            padding: 10px 12px;
-            margin-bottom: 8px;
-            background: white;
-            border-radius: 8px;
-            border: 1px solid #dee2e6;
+            border-bottom: 2px solid #e8f5e9;
             display: flex;
             align-items: center;
             gap: 10px;
         }
         
-        #usersList li .avatar {
-            font-size: 20px;
+        /* قائمة المستخدمين */
+        #usersList {
+            list-style: none;
+            max-height: 300px;
+            overflow-y: auto;
         }
         
+        #usersList li {
+            padding: 10px 12px;
+            margin-bottom: 8px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: background 0.3s;
+        }
+        
+        #usersList li:hover {
+            background: #e8f5e9;
+        }
+        
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .user-avatar-small {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: #ddd;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            overflow: hidden;
+        }
+        
+        .user-avatar-small img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .user-status {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #28a745;
+        }
+        
+        .user-status.muted {
+            background: #dc3545;
+        }
+        
+        .user-actions {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .user-actions button {
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+        
+        /* منطقة الدردشة */
         .chat-area {
             flex: 1;
             display: flex;
             flex-direction: column;
         }
         
+        /* الرسائل */
         #messages {
             flex: 1;
             padding: 20px;
             overflow-y: auto;
             background: #f8f9fa;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
         }
         
         .message {
             background: white;
             padding: 15px;
-            margin-bottom: 15px;
             border-radius: 15px;
             border: 1px solid #e0e0e0;
             box-shadow: 0 2px 8px rgba(0,0,0,0.05);
             max-width: 80%;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
         
         .message.own {
@@ -226,49 +374,140 @@
             border-color: #bbdefb;
         }
         
+        .message.other {
+            margin-left: auto;
+            background: #f1f8e9;
+            border-color: #dcedc8;
+        }
+        
         .message.system {
+            max-width: 100%;
             background: #fff3e0;
             border-color: #ffe0b2;
             text-align: center;
-            max-width: 100%;
             font-style: italic;
         }
         
-        .message .user-info {
+        .message.reply {
+            border-right: 4px solid var(--primary);
+        }
+        
+        .message-header {
             display: flex;
             align-items: center;
             gap: 10px;
-            margin-bottom: 8px;
+            margin-bottom: 10px;
         }
         
-        .message .avatar {
-            font-size: 24px;
+        .message-avatar {
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            background: #ddd;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            overflow: hidden;
+            flex-shrink: 0;
         }
         
-        .message .username {
-            color: var(--primary);
+        .message-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .message-user {
             font-weight: bold;
+            color: var(--primary);
         }
         
-        .message .time {
+        .message-time {
             color: #666;
             font-size: 12px;
             margin-right: auto;
         }
         
-        .message .text {
+        .message-content {
             margin: 10px 0;
             line-height: 1.5;
+        }
+        
+        .message-text {
             font-size: 15px;
+            word-break: break-word;
         }
         
-        .message .date {
-            color: #888;
-            font-size: 11px;
-            text-align: left;
-            margin-top: 5px;
+        .message-reply {
+            background: rgba(0,0,0,0.05);
+            padding: 8px 12px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border-right: 3px solid var(--primary);
+            font-size: 14px;
+            color: #666;
         }
         
+        .message-reply small {
+            display: block;
+            color: #999;
+            font-size: 12px;
+        }
+        
+        /* الملفات */
+        .message-file {
+            margin-top: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .file-preview {
+            max-width: 300px;
+            max-height: 200px;
+            object-fit: contain;
+            background: #000;
+        }
+        
+        .file-info {
+            padding: 10px;
+            background: #f8f9fa;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .file-info i {
+            font-size: 24px;
+            color: var(--primary);
+        }
+        
+        /* الرسائل الصوتية */
+        .voice-message {
+            margin-top: 10px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 10px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .voice-player {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .voice-duration {
+            font-size: 12px;
+            color: #666;
+            min-width: 40px;
+        }
+        
+        /* مؤشر الكتابة */
         .typing-indicator {
             padding: 10px 20px;
             color: #666;
@@ -277,8 +516,15 @@
             background: #f8f9fa;
             border-top: 1px solid #dee2e6;
             display: none;
+            animation: pulse 1.5s infinite;
         }
         
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        /* منطقة الإدخال */
         .input-area {
             padding: 20px;
             background: white;
@@ -288,55 +534,95 @@
             align-items: center;
         }
         
-        .input-area input {
+        .input-tools {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .input-tools button {
+            width: 40px;
+            height: 40px;
+            padding: 0;
+            border-radius: 50%;
+        }
+        
+        #messageInput {
             flex: 1;
             padding: 12px 16px;
             border: 2px solid #ddd;
             border-radius: 10px;
             font-size: 16px;
             transition: border-color 0.3s;
+            min-height: 20px;
+            max-height: 100px;
+            overflow-y: auto;
+            resize: none;
         }
         
-        .input-area input:focus {
+        #messageInput:focus {
             outline: none;
             border-color: var(--secondary);
         }
         
-        .profile-btn {
-            background: #6c757d;
-            padding: 10px 15px;
-            border-radius: 10px;
+        /* تسجيل الصوت */
+        .recording-indicator {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(220, 53, 69, 0.9);
             color: white;
-            cursor: pointer;
+            padding: 20px 30px;
+            border-radius: 15px;
+            display: none;
+            align-items: center;
+            gap: 15px;
+            z-index: 2000;
+            animation: recordingPulse 1s infinite;
         }
         
+        @keyframes recordingPulse {
+            0%, 100% { box-shadow: 0 0 20px rgba(220, 53, 69, 0.5); }
+            50% { box-shadow: 0 0 40px rgba(220, 53, 69, 0.8); }
+        }
+        
+        /* للشاشات الصغيرة */
         @media (max-width: 768px) {
-            .users-sidebar {
+            .sidebar {
                 display: none;
             }
             
             .chat-app {
-                height: 95vh;
+                height: 100vh;
+                border-radius: 0;
+            }
+            
+            body {
+                padding: 0;
             }
             
             .message {
                 max-width: 90%;
             }
             
-            .login-box {
-                width: 90%;
-                margin: 20px;
+            .modal-content {
+                width: 95%;
+            }
+            
+            .user-profile span {
+                display: none;
             }
         }
     </style>
 </head>
 <body>
-    <!-- نافذة تسجيل الدخول -->
-    <div id="loginModal" class="login-modal">
-        <div class="login-box">
-            <h2>🎭 اختر شخصيتك</h2>
-            <input type="text" id="usernameInput" placeholder="اسمك في الشات" value="زائر">
+    <!-- ========== نافذة تسجيل الدخول ========== -->
+    <div id="loginModal" class="modal">
+        <div class="modal-content">
+            <h2><i class="fas fa-door-open"></i> دخول إلى الشات</h2>
+            <input type="text" id="usernameInput" placeholder="اسمك في الشات" value="زائر" maxlength="20">
             
+            <h3><i class="fas fa-user-circle"></i> اختر صورتك</h3>
             <div class="avatar-options">
                 <div class="avatar-option selected" data-avatar="👤">👤</div>
                 <div class="avatar-option" data-avatar="👑">👑</div>
@@ -344,324 +630,886 @@
                 <div class="avatar-option" data-avatar="🐯">🐯</div>
                 <div class="avatar-option" data-avatar="🦊">🦊</div>
                 <div class="avatar-option" data-avatar="🦉">🦉</div>
-                <div class="avatar-option" data-avatar="🐉">🐉</div>
-                <div class="avatar-option" data-avatar="🦄">🦄</div>
+                <div class="avatar-option" id="customAvatarBtn" title="رفع صورة">
+                    <i class="fas fa-plus"></i>
+                </div>
             </div>
             
-            <button onclick="completeLogin()" style="width:100%; padding:12px; margin-top:15px;">
-                🚀 دخول إلى الشات
+            <input type="file" id="avatarUploadInput" accept="image/*" style="display: none;">
+            <div id="avatarPreview" style="margin: 15px 0; display: none;">
+                <div class="avatar-option selected" style="width: 80px; height: 80px; margin: 0 auto;">
+                    <img id="previewImage" src="" alt="معاينة">
+                </div>
+            </div>
+            
+            <button onclick="completeLogin()" style="width:100%; padding:15px; margin-top:15px;">
+                <i class="fas fa-sign-in-alt"></i> دخول إلى الشات
             </button>
             
             <p style="margin-top:15px; color:#666; font-size:14px;">
-                يمكنك تغيير الاسم والصورة لاحقاً
+                يمكنك تغيير الاسم والصورة لاحقاً من ملفك الشخصي
             </p>
         </div>
     </div>
     
-    <!-- واجهة الشات الرئيسية -->
+    <!-- ========== واجهة الشات الرئيسية ========== -->
     <div class="chat-app" style="display: none;" id="chatApp">
+        <!-- الهيدر -->
         <div class="header">
-            <h1><i class="fas fa-comments"></i> شات عربي مجاني</h1>
-            <p>دردشة عربية حية - تواصل مع الأصدقاء الآن!</p>
+            <div class="user-profile" onclick="toggleProfileMenu()">
+                <div class="user-avatar" id="headerAvatar">
+                    👤
+                </div>
+                <span id="headerUsername">زائر</span>
+            </div>
+            <h1><i class="fas fa-comments"></i> شات عربي متكامل</h1>
+            <p>دردشة، صور، صوت، ومميزات متقدمة</p>
         </div>
         
+        <!-- الإحصائيات -->
         <div class="stats">
             <div>
-                <i class="fas fa-users"></i> 
+                <i class="fas fa-users"></i>
                 <span id="onlineCount">0</span> متصلون
             </div>
             <div>
-                <i class="fas fa-wifi"></i> 
+                <i class="fas fa-wifi"></i>
                 <span id="connectionStatus">جارٍ الاتصال...</span>
             </div>
-            <div class="profile-btn" onclick="showProfileMenu()">
-                <i class="fas fa-user"></i> الملف الشخصي
+            <div>
+                <i class="fas fa-volume-up"></i>
+                <span id="soundStatus">🔊</span>
+                <button onclick="toggleSound()" style="padding:5px 10px; font-size:12px;">تشغيل/إيقاف</button>
             </div>
         </div>
         
+        <!-- المحتوى الرئيسي -->
         <div class="main-content">
-            <div class="users-sidebar">
-                <h3><i class="fas fa-user-friends"></i> المتصلون الآن</h3>
-                <ul id="usersList">
-                    <li>جارٍ التحميل...</li>
-                </ul>
+            <!-- الشريط الجانبي -->
+            <div class="sidebar">
+                <!-- المستخدمون المتصلون -->
+                <div class="sidebar-section">
+                    <h3><i class="fas fa-user-friends"></i> المتصلون الآن</h3>
+                    <ul id="usersList">
+                        <li>جارٍ التحميل...</li>
+                    </ul>
+                </div>
+                
+                <!-- الملف الشخصي -->
+                <div class="sidebar-section">
+                    <h3><i class="fas fa-user-cog"></i> ملفك الشخصي</h3>
+                    <div style="text-align: center; margin-bottom: 15px;">
+                        <div class="user-avatar" id="sidebarAvatar" style="width: 80px; height: 80px; margin: 0 auto 10px; font-size: 40px;">
+                            👤
+                        </div>
+                        <strong id="sidebarUsername">زائر</strong>
+                    </div>
+                    <button onclick="changeAvatar()" style="width:100%; margin-bottom:5px;">
+                        <i class="fas fa-camera"></i> تغيير الصورة
+                    </button>
+                    <button onclick="changeUsername()" style="width:100%;">
+                        <i class="fas fa-edit"></i> تغيير الاسم
+                    </button>
+                </div>
+                
+                <!-- الإعدادات السريعة -->
+                <div class="sidebar-section">
+                    <h3><i class="fas fa-cogs"></i> الإعدادات</h3>
+                    <button onclick="toggleNotifications()" style="width:100%; margin-bottom:5px;">
+                        <i class="fas fa-bell"></i> الإشعارات: <span id="notifStatus">تشغيل</span>
+                    </button>
+                    <button onclick="clearChat()" style="width:100%;" class="warning">
+                        <i class="fas fa-trash"></i> مسح المحادثة
+                    </button>
+                </div>
             </div>
             
+            <!-- منطقة الدردشة -->
             <div class="chat-area">
+                <!-- الرسائل -->
                 <div id="messages">
                     <div class="message system">
-                        <div class="text">🌟 مرحباً بك في الشات العربي! قم بتسجيل الدخول للبدء.</div>
+                        <div class="message-content">
+                            🌟 مرحباً بك في الشات العربي المتكامل!
+                            <br><small>يمكنك إرسال نصوص، صور، فيديوهات، ورسائل صوتية</small>
+                        </div>
                     </div>
                 </div>
                 
+                <!-- مؤشر الكتابة -->
                 <div class="typing-indicator" id="typingIndicator">
                     <span id="typingUser">مستخدم</span> يكتب...
                 </div>
                 
+                <!-- منطقة الإدخال -->
                 <div class="input-area">
-                    <input type="text" id="messageInput" placeholder="اكتب رسالتك هنا..." autocomplete="off" disabled>
-                    <button onclick="sendMessage()" id="sendBtn" disabled>
+                    <div class="input-tools">
+                        <button onclick="toggleFileUpload()" title="إرسال ملف">
+                            <i class="fas fa-paperclip"></i>
+                        </button>
+                        <button onclick="toggleEmojiPicker()" title="إيموجي">
+                            <i class="fas fa-smile"></i>
+                        </button>
+                        <button onclick="startRecording()" id="recordBtn" title="تسجيل صوت">
+                            <i class="fas fa-microphone"></i>
+                        </button>
+                        <button onclick="showReplyTo()" title="رد على رسالة" id="replyBtn" style="display:none;">
+                            <i class="fas fa-reply"></i>
+                        </button>
+                    </div>
+                    
+                    <div contenteditable="true" id="messageInput" placeholder="اكتب رسالتك هنا..."></div>
+                    
+                    <button onclick="sendMessage()" id="sendBtn" style="padding:12px 25px;">
                         <i class="fas fa-paper-plane"></i> إرسال
                     </button>
                 </div>
             </div>
         </div>
     </div>
+    
+    <!-- ========== نافذة رفع الملفات ========== -->
+    <div id="fileModal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <h3><i class="fas fa-upload"></i> رفع ملف</h3>
+            <input type="file" id="fileInput" accept="image/*,video/*" multiple>
+            <div id="filePreviewContainer" style="margin:15px 0;"></div>
+            <button onclick="uploadFiles()" id="uploadBtn">
+                <i class="fas fa-upload"></i> رفع الملفات
+            </button>
+            <button onclick="closeFileModal()" class="danger">
+                <i class="fas fa-times"></i> إلغاء
+            </button>
+        </div>
+    </div>
+    
+    <!-- ========== مؤشر التسجيل الصوتي ========== -->
+    <div class="recording-indicator" id="recordingIndicator">
+        <div class="pulse-circle"></div>
+        <div>
+            <strong>🎤 جاري التسجيل...</strong>
+            <div id="recordingTimer">00:00</div>
+        </div>
+        <button onclick="stopRecording()" class="danger" style="padding:8px 15px;">
+            <i class="fas fa-stop"></i> إيقاف
+        </button>
+    </div>
+
+    <!-- ========== ملفات الصوت ========== -->
+    <audio id="messageSound" preload="auto">
+        <source src="https://assets.mixkit.co/sfx/preview/mixkit-message-pop-alert-2354.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="notificationSound" preload="auto">
+        <source src="https://assets.mixkit.co/sfx/preview/mixkit-correct-answer-tone-2870.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="voiceMessageSound" preload="auto">
+        <source src="https://assets.mixkit.co/sfx/preview/mixkit-retro-game-emergency-alarm-1000.mp3" type="audio/mpeg">
+    </audio>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
-        // الاتصال بالسيرفر
+        // ========== المتغيرات العامة ==========
         const socket = io();
-        
-        // بيانات المستخدم الحالي
         let currentUser = {
             username: '',
             avatar: '👤',
+            avatarImage: null,
             id: null
         };
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let recordingTimer = null;
+        let recordingStartTime = null;
+        let replyingTo = null;
+        let soundEnabled = true;
+        let notificationsEnabled = true;
         
-        // عناصر DOM
-        const loginModal = document.getElementById('loginModal');
-        const chatApp = document.getElementById('chatApp');
-        const usernameInput = document.getElementById('usernameInput');
-        const messageInput = document.getElementById('messageInput');
-        const sendBtn = document.getElementById('sendBtn');
-        const onlineCount = document.getElementById('onlineCount');
-        const connectionStatus = document.getElementById('connectionStatus');
-        const usersList = document.getElementById('usersList');
-        const messagesDiv = document.getElementById('messages');
-        const typingIndicator = document.getElementById('typingIndicator');
-        const typingUser = document.getElementById('typingUser');
-        
-        // ============== إعدادات أولية ==============
-        
-        // اختيار الصورة الشخصية
-        document.querySelectorAll('.avatar-option').forEach(option => {
-            option.addEventListener('click', function() {
-                document.querySelectorAll('.avatar-option').forEach(opt => {
-                    opt.classList.remove('selected');
-                });
-                this.classList.add('selected');
-                currentUser.avatar = this.dataset.avatar;
-            });
+        // ========== تهيئة الصفحة ==========
+        document.addEventListener('DOMContentLoaded', function() {
+            loadUserData();
+            setupEventListeners();
+            setupSocketEvents();
         });
         
-        // تحميل بيانات المستخدم السابقة
-        window.addEventListener('load', () => {
-            const savedUser = localStorage.getItem('chat_user');
+        // ========== تحميل بيانات المستخدم ==========
+        function loadUserData() {
+            const savedUser = localStorage.getItem('arabic_chat_user');
             if (savedUser) {
-                currentUser = JSON.parse(savedUser);
-                usernameInput.value = currentUser.username;
+                const parsed = JSON.parse(savedUser);
+                currentUser.username = parsed.username || 'زائر';
+                currentUser.avatar = parsed.avatar || '👤';
+                currentUser.avatarImage = parsed.avatarImage || null;
                 
-                // تحديد الصورة الشخصية المحفوظة
+                document.getElementById('usernameInput').value = currentUser.username;
+                
+                // تحديد الصورة المحفوظة
                 document.querySelectorAll('.avatar-option').forEach(opt => {
                     if (opt.dataset.avatar === currentUser.avatar) {
                         opt.classList.add('selected');
                     }
                 });
+                
+                // عرض الصورة الشخصية المرفوعة
+                if (currentUser.avatarImage) {
+                    document.getElementById('previewImage').src = currentUser.avatarImage;
+                    document.getElementById('avatarPreview').style.display = 'block';
+                }
             }
-        });
+        }
         
-        // ============== إكمال تسجيل الدخول ==============
+        // ========== إعداد المستمعين للأحداث ==========
+        function setupEventListeners() {
+            // اختيار الصورة الشخصية
+            document.querySelectorAll('.avatar-option').forEach(option => {
+                option.addEventListener('click', function() {
+                    if (this.id === 'customAvatarBtn') {
+                        document.getElementById('avatarUploadInput').click();
+                        return;
+                    }
+                    
+                    document.querySelectorAll('.avatar-option').forEach(opt => {
+                        opt.classList.remove('selected');
+                    });
+                    this.classList.add('selected');
+                    currentUser.avatar = this.dataset.avatar;
+                    currentUser.avatarImage = null;
+                    document.getElementById('avatarPreview').style.display = 'none';
+                });
+            });
+            
+            // رفع صورة شخصية مخصصة
+            document.getElementById('avatarUploadInput').addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file && file.type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        currentUser.avatarImage = e.target.result;
+                        currentUser.avatar = '🖼️';
+                        
+                        document.getElementById('previewImage').src = e.target.result;
+                        document.getElementById('avatarPreview').style.display = 'block';
+                        
+                        document.querySelectorAll('.avatar-option').forEach(opt => {
+                            opt.classList.remove('selected');
+                        });
+                        document.getElementById('customAvatarBtn').classList.add('selected');
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+            
+            // الإدخال التلقائي
+            document.getElementById('messageInput').addEventListener('input', function() {
+                if (this.textContent.trim()) {
+                    socket.emit('typing');
+                }
+            });
+            
+            // إرسال بالإنتر
+            document.getElementById('messageInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                }
+            });
+        }
+        
+        // ========== أحداث Socket.io ==========
+        function setupSocketEvents() {
+            // الاتصال
+            socket.on('connect', () => {
+                console.log('✅ متصل بالسيرفر');
+                document.getElementById('connectionStatus').textContent = 'متصل';
+                document.getElementById('connectionStatus').style.color = '#28a745';
+                
+                // تسجيل الدخول التلقائي إذا كان هناك بيانات
+                if (currentUser.username) {
+                    setTimeout(() => {
+                        completeLogin();
+                    }, 500);
+                }
+            });
+            
+            // قطع الاتصال
+            socket.on('disconnect', () => {
+                document.getElementById('connectionStatus').textContent = 'غير متصل';
+                document.getElementById('connectionStatus').style.color = '#dc3545';
+            });
+            
+            // الترحيب
+            socket.on('welcome', (data) => {
+                console.log('مرحباً بك:', data.message);
+                updateUsersList(data.users);
+                
+                // عرض الرسائل القديمة
+                data.history.forEach(msg => {
+                    displayMessage(msg);
+                });
+                
+                // إضافة رسالة ترحيب
+                const welcomeMsg = {
+                    type: 'system',
+                    user: 'النظام',
+                    text: `🌟 ${data.message}`,
+                    time: new Date().toLocaleTimeString('ar-SA')
+                };
+                displayMessage(welcomeMsg);
+            });
+            
+            // تحديث المستخدمين
+            socket.on('users update', (users) => {
+                document.getElementById('onlineCount').textContent = users.length;
+                updateUsersList(users);
+            });
+            
+            // مستخدم جديد
+            socket.on('user joined', (user) => {
+                const joinMsg = {
+                    type: 'system',
+                    user: 'النظام',
+                    text: `🟢 ${user.username} انضم للشات`,
+                    time: new Date().toLocaleTimeString('ar-SA')
+                };
+                displayMessage(joinMsg);
+                playSound('notification');
+            });
+            
+            // مستخدم غادر
+            socket.on('user left', (user) => {
+                const leaveMsg = {
+                    type: 'system',
+                    user: 'النظام',
+                    text: `🔴 ${user.username} غادر الشات`,
+                    time: new Date().toLocaleTimeString('ar-SA')
+                };
+                displayMessage(leaveMsg);
+            });
+            
+            // رسالة جديدة
+            socket.on('new message', (message) => {
+                displayMessage(message);
+                
+                // إشعار صوتي
+                if (message.userId !== socket.id && soundEnabled) {
+                    playSound('message');
+                }
+                
+                // إشعار للمتصفح
+                if (notificationsEnabled && message.userId !== socket.id && document.hidden) {
+                    showNotification(message.user, message.text || 'أرسل ملف');
+                }
+            });
+            
+            // مؤشر الكتابة
+            socket.on('user typing', (username) => {
+                document.getElementById('typingUser').textContent = username;
+                document.getElementById('typingIndicator').style.display = 'block';
+                
+                clearTimeout(window.typingTimeout);
+                window.typingTimeout = setTimeout(() => {
+                    document.getElementById('typingIndicator').style.display = 'none';
+                }, 3000);
+            });
+            
+            // تشغيل صوت
+            socket.on('play sound', (soundType) => {
+                if (soundEnabled) {
+                    playSound(soundType);
+                }
+            });
+            
+            // مستخدم تم كتمه
+            socket.on('user muted', (data) => {
+                const msg = {
+                    type: 'system',
+                    user: 'النظام',
+                    text: `🔇 ${data.mutedBy} كتم ${data.userId === socket.id ? 'ك' : 'مستخدم'}`,
+                    time: new Date().toLocaleTimeString('ar-SA')
+                };
+                displayMessage(msg);
+            });
+            
+            // مستخدم تم إلغاء كتمه
+            socket.on('user unmuted', (userId) => {
+                const msg = {
+                    type: 'system',
+                    user: 'النظام',
+                    text: `🔊 تم إلغاء كتم ${userId === socket.id ? 'ك' : 'مستخدم'}`,
+                    time: new Date().toLocaleTimeString('ar-SA')
+                };
+                displayMessage(msg);
+            });
+        }
+        
+        // ========== دوال المستخدم ==========
         function completeLogin() {
-            const username = usernameInput.value.trim() || 'زائر';
+            const username = document.getElementById('usernameInput').value.trim() || 'زائر';
             currentUser.username = username;
             currentUser.id = socket.id;
             
             // إخفاء نافذة الدخول
-            loginModal.style.display = 'none';
+            document.getElementById('loginModal').style.display = 'none';
             
             // إظهار واجهة الشات
-            chatApp.style.display = 'flex';
+            document.getElementById('chatApp').style.display = 'flex';
             
             // إرسال بيانات المستخدم للسيرفر
             socket.emit('register user', currentUser);
             
             // حفظ في localStorage
-            localStorage.setItem('chat_user', JSON.stringify(currentUser));
+            localStorage.setItem('arabic_chat_user', JSON.stringify(currentUser));
             
-            // تفعيل إدخال الرسائل
-            messageInput.disabled = false;
-            sendBtn.disabled = false;
-            messageInput.focus();
+            // تحديث الواجهة
+            updateUserInterface();
             
-            // تحديث العنوان
-            document.querySelector('.header h1').innerHTML = 
-                `<i class="fas fa-comments"></i> شات عربي - ${currentUser.username}`;
+            // تفعيل الإدخال
+            document.getElementById('messageInput').focus();
         }
         
-        // ============== أحداث Socket.io ==============
-        
-        // استقبال الترحيب من السيرفر
-        socket.on('welcome', (data) => {
-            console.log('مرحباً بك:', data.message);
-            connectionStatus.textContent = 'متصل';
-            connectionStatus.style.color = '#2E7D32';
+        function updateUserInterface() {
+            // تحديث الهيدر
+            document.getElementById('headerUsername').textContent = currentUser.username;
+            updateAvatarDisplay(document.getElementById('headerAvatar'), currentUser);
             
-            // تحديث عدد المستخدمين
-            onlineCount.textContent = data.users.length;
-            
-            // تحديث قائمة المستخدمين
-            updateUsersList(data.users);
-            
-            // عرض الرسائل القديمة
-            messagesDiv.innerHTML = '';
-            data.history.forEach(msg => {
-                displayMessage(msg);
-            });
-            
-            // إضافة رسالة ترحيب
-            const welcomeMsg = {
-                type: 'system',
-                text: `🌟 ${data.message}`,
-                time: new Date().toLocaleTimeString('ar-SA')
-            };
-            displayMessage(welcomeMsg);
-        });
+            // تحديث الشريط الجانبي
+            document.getElementById('sidebarUsername').textContent = currentUser.username;
+            updateAvatarDisplay(document.getElementById('sidebarAvatar'), currentUser);
+        }
         
-        // تحديث قائمة المستخدمين
-        socket.on('users update', (users) => {
-            onlineCount.textContent = users.length;
-            updateUsersList(users);
-        });
+        function updateAvatarDisplay(element, user) {
+            if (user.avatarImage) {
+                element.innerHTML = `<img src="${user.avatarImage}" alt="${user.username}">`;
+            } else {
+                element.textContent = user.avatar;
+            }
+        }
         
-        // مستخدم جديد انضم
-        socket.on('user joined', (user) => {
-            const joinMsg = {
-                type: 'system',
-                text: `🟢 ${user.username} انضم للشات`,
-                time: new Date().toLocaleTimeString('ar-SA')
-            };
-            displayMessage(joinMsg);
-        });
-        
-        // مستخدم غادر
-        socket.on('user left', (user) => {
-            const leaveMsg = {
-                type: 'system',
-                text: `🔴 ${user.username} غادر الشات`,
-                time: new Date().toLocaleTimeString('ar-SA')
-            };
-            displayMessage(leaveMsg);
-        });
-        
-        // استقبال رسالة جديدة
-        socket.on('new message', (message) => {
-            displayMessage(message);
-        });
-        
-        // مؤشر الكتابة
-        socket.on('user typing', (username) => {
-            typingUser.textContent = username;
-            typingIndicator.style.display = 'block';
-            
-            clearTimeout(window.typingTimeout);
-            window.typingTimeout = setTimeout(() => {
-                typingIndicator.style.display = 'none';
-            }, 3000);
-        });
-        
-        // الاتصال
-        socket.on('connect', () => {
-            console.log('✅ متصل بالسيرفر');
-        });
-        
-        // قطع الاتصال
-        socket.on('disconnect', () => {
-            connectionStatus.textContent = 'غير متصل';
-            connectionStatus.style.color = '#dc3545';
-        });
-        
-        // ============== دوال مساعدة ==============
-        
-        // تحديث قائمة المستخدمين
         function updateUsersList(users) {
+            const usersList = document.getElementById('usersList');
             usersList.innerHTML = '';
+            
             users.forEach(user => {
                 const li = document.createElement('li');
-                li.innerHTML = `
-                    <span class="avatar">${user.avatar}</span>
-                    <span>${user.username}</span>
-                    ${user.id === socket.id ? '<small>(أنت)</small>' : ''}
-                `;
+                
+                const userInfo = document.createElement('div');
+                userInfo.className = 'user-info';
+                
+                const avatarDiv = document.createElement('div');
+                avatarDiv.className = 'user-avatar-small';
+                updateAvatarDisplay(avatarDiv, user);
+                
+                const nameSpan = document.createElement('span');
+                nameSpan.textContent = user.username + (user.id === socket.id ? ' (أنت)' : '');
+                
+                const statusDiv = document.createElement('div');
+                statusDiv.className = `user-status ${user.isMuted ? 'muted' : ''}`;
+                
+                userInfo.appendChild(avatarDiv);
+                userInfo.appendChild(nameSpan);
+                userInfo.appendChild(statusDiv);
+                
+                li.appendChild(userInfo);
+                
+                // أزرار الإجراءات للمستخدمين الآخرين
+                if (user.id !== socket.id) {
+                    const actionsDiv = document.createElement('div');
+                    actionsDiv.className = 'user-actions';
+                    
+                    const replyBtn = document.createElement('button');
+                    replyBtn.innerHTML = '<i class="fas fa-reply"></i>';
+                    replyBtn.title = 'رد';
+                    replyBtn.onclick = () => setReplyTo(user);
+                    
+                    const muteBtn = document.createElement('button');
+                    muteBtn.innerHTML = user.isMuted ? '<i class="fas fa-volume-up"></i>' : '<i class="fas fa-volume-mute"></i>';
+                    muteBtn.title = user.isMuted ? 'إلغاء كتم' : 'كتم';
+                    muteBtn.className = user.isMuted ? '' : 'danger';
+                    muteBtn.onclick = () => toggleMuteUser(user.id, user.isMuted);
+                    
+                    actionsDiv.appendChild(replyBtn);
+                    actionsDiv.appendChild(muteBtn);
+                    li.appendChild(actionsDiv);
+                }
+                
                 usersList.appendChild(li);
             });
         }
         
-        // عرض رسالة
-        function displayMessage(msg) {
+        // ========== إدارة الرسائل ==========
+        function displayMessage(message) {
+            const messagesDiv = document.getElementById('messages');
             const msgDiv = document.createElement('div');
             
-            if (msg.type === 'system') {
-                msgDiv.className = 'message system';
-                msgDiv.innerHTML = `
-                    <div class="text">${msg.text}</div>
-                    <div class="time">${msg.time || ''}</div>
-                `;
+            let msgClass = 'message';
+            if (message.userId === socket.id) {
+                msgClass += ' own';
+            } else if (message.userId) {
+                msgClass += ' other';
             } else {
-                const isOwnMessage = msg.userId === socket.id;
-                msgDiv.className = `message ${isOwnMessage ? 'own' : ''}`;
-                msgDiv.innerHTML = `
-                    <div class="user-info">
-                        <span class="avatar">${msg.avatar || '👤'}</span>
-                        <span class="username">${msg.user || 'مجهول'}</span>
-                        <span class="time">${msg.time || ''}</span>
+                msgClass += ' system';
+            }
+            
+            if (message.type === 'reply') {
+                msgClass += ' reply';
+            }
+            
+            msgDiv.className = msgClass;
+            
+            let contentHTML = '';
+            
+            // رأس الرسالة
+            if (message.userId) {
+                contentHTML += `
+                    <div class="message-header">
+                        <div class="message-avatar">
+                            ${message.avatarImage ? 
+                                `<img src="${message.avatarImage}" alt="${message.user}">` : 
+                                message.avatar}
+                        </div>
+                        <div class="message-user">${message.user}</div>
+                        <div class="message-time">${message.time}</div>
                     </div>
-                    <div class="text">${msg.text}</div>
-                    <div class="date">${msg.date || ''}</div>
                 `;
             }
             
+            // محتوى الرسالة
+            contentHTML += '<div class="message-content">';
+            
+            // الرد على رسالة
+            if (message.type === 'reply' && message.replyToUser) {
+                contentHTML += `
+                    <div class="message-reply">
+                        <small>رد على ${message.replyToUser}</small>
+                        ${message.replyText || ''}
+                    </div>
+                `;
+            }
+            
+            // النص
+            if (message.text) {
+                contentHTML += `<div class="message-text">${message.text}</div>`;
+            }
+            
+            // ملف
+            if (message.type === 'file') {
+                if (message.fileType === 'image') {
+                    contentHTML += `
+                        <div class="message-file">
+                            <img src="${message.fileData}" alt="صورة" class="file-preview" onclick="openImage('${message.fileData}')" style="cursor:pointer;">
+                            <div class="file-info">
+                                <i class="fas fa-image"></i>
+                                <div>
+                                    <div>${message.fileName}</div>
+                                    <small>${message.fileSize}</small>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                } else if (message.fileType === 'video') {
+                    contentHTML += `
+                        <div class="message-file">
+                            <video src="${message.fileData}" controls class="file-preview"></video>
+                            <div class="file-info">
+                                <i class="fas fa-video"></i>
+                                <div>
+                                    <div>${message.fileName}</div>
+                                    <small>${message.fileSize}</small>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+            
+            // رسالة صوتية
+            if (message.type === 'voice') {
+                contentHTML += `
+                    <div class="voice-message">
+                        <div class="voice-player">
+                            <button onclick="playVoiceMessage('${message.voiceId}')" style="padding:8px; border-radius:50%;">
+                                <i class="fas fa-play"></i>
+                            </button>
+                            <div class="voice-duration">${formatTime(message.duration || 0)}</div>
+                        </div>
+                        <small>رسالة صوتية من ${message.user}</small>
+                    </div>
+                `;
+            }
+            
+            contentHTML += '</div>';
+            
+            // التاريخ
+            if (message.date) {
+                contentHTML += `<div class="message-date">${message.date}</div>`;
+            }
+            
+            msgDiv.innerHTML = contentHTML;
             messagesDiv.appendChild(msgDiv);
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
         }
         
-        // إرسال رسالة
         function sendMessage() {
-            const text = messageInput.value.trim();
+            const messageInput = document.getElementById('messageInput');
+            const text = messageInput.textContent.trim();
             
-            if (text && currentUser.username) {
+            if (!text && !replyingTo) return;
+            
+            if (replyingTo) {
+                // إرسال رد
+                socket.emit('reply to message', {
+                    text: text,
+                    replyTo: replyingTo.id,
+                    replyToUser: replyingTo.user
+                });
+                clearReply();
+            } else {
+                // إرسال رسالة عادية
                 socket.emit('send message', { text: text });
-                messageInput.value = '';
-                socket.emit('typing'); // إيقاف مؤشر الكتابة
+            }
+            
+            messageInput.textContent = '';
+            messageInput.focus();
+        }
+        
+        function setReplyTo(user) {
+            replyingTo = { id: user.id, user: user.username };
+            document.getElementById('replyBtn').style.display = 'block';
+            document.getElementById('messageInput').placeholder = `رد على ${user.username}...`;
+            document.getElementById('messageInput').focus();
+        }
+        
+        function clearReply() {
+            replyingTo = null;
+            document.getElementById('replyBtn').style.display = 'none';
+            document.getElementById('messageInput').placeholder = 'اكتب رسالتك هنا...';
+        }
+        
+        function showReplyTo() {
+            if (replyingTo) {
+                alert(`الرد على: ${replyingTo.user}`);
             }
         }
         
-        // التعامل مع الكتابة
-        messageInput.addEventListener('input', () => {
-            if (messageInput.value.trim()) {
-                socket.emit('typing');
-            }
-        });
+        // ========== الملفات والصور ==========
+        function toggleFileUpload() {
+            const modal = document.getElementById('fileModal');
+            modal.style.display = modal.style.display === 'flex' ? 'none' : 'flex';
+        }
         
-        // إرسال بالضغط على Enter
-        messageInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                sendMessage();
-            }
-        });
+        function closeFileModal() {
+            document.getElementById('fileModal').style.display = 'none';
+            document.getElementById('fileInput').value = '';
+            document.getElementById('filePreviewContainer').innerHTML = '';
+        }
         
-        // عرض قائمة الملف الشخصي
-        function showProfileMenu() {
-            const newUsername = prompt('اسمك الجديد:', currentUser.username);
-            if (newUsername && newUsername.trim()) {
-                currentUser.username = newUsername.trim();
+        function uploadFiles() {
+            const fileInput = document.getElementById('fileInput');
+            const files = fileInput.files;
+            
+            if (files.length === 0) {
+                alert('الرجاء اختيار ملف أولاً');
+                return;
+            }
+            
+            Array.from(files).forEach(file => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const fileData = {
+                        type: file.type.startsWith('image/') ? 'image' : 'video',
+                        data: e.target.result,
+                        name: file.name,
+                        size: formatFileSize(file.size)
+                    };
+                    
+                    socket.emit('send file', fileData);
+                };
+                reader.readAsDataURL(file);
+            });
+            
+            closeFileModal();
+            playSound('notification');
+        }
+        
+        function openImage(src) {
+            window.open(src, '_blank');
+        }
+        
+        // ========== التسجيل الصوتي ==========
+        async function startRecording() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                
+                mediaRecorder.ondataavailable = (event) => {
+                    audioChunks.push(event.data);
+                };
+                
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    const reader = new FileReader();
+                    
+                    reader.onload = () => {
+                        const duration = (Date.now() - recordingStartTime) / 1000;
+                        
+                        socket.emit('send voice', {
+                            data: reader.result,
+                            duration: duration
+                        });
+                        
+                        // تنظيف
+                        stream.getTracks().forEach(track => track.stop());
+                        audioChunks = [];
+                    };
+                    
+                    reader.readAsDataURL(audioBlob);
+                };
+                
+                // بدء التسجيل
+                mediaRecorder.start();
+                recordingStartTime = Date.now();
+                
+                // عرض المؤشر
+                document.getElementById('recordingIndicator').style.display = 'flex';
+                document.getElementById('recordBtn').innerHTML = '<i class="fas fa-stop"></i>';
+                document.getElementById('recordBtn').onclick = stopRecording;
+                
+                // المؤقت
+                startRecordingTimer();
+                
+            } catch (error) {
+                console.error('خطأ في التسجيل:', error);
+                alert('تعذر الوصول إلى الميكروفون. الرجاء التحقق من الصلاحيات.');
+            }
+        }
+        
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                
+                // إخفاء المؤشر
+                document.getElementById('recordingIndicator').style.display = 'none';
+                document.getElementById('recordBtn').innerHTML = '<i class="fas fa-microphone"></i>';
+                document.getElementById('recordBtn').onclick = startRecording;
+                
+                // إيقاف المؤقت
+                stopRecordingTimer();
+            }
+        }
+        
+        function startRecordingTimer() {
+            let seconds = 0;
+            recordingTimer = setInterval(() => {
+                seconds++;
+                const minutes = Math.floor(seconds / 60);
+                const secs = seconds % 60;
+                document.getElementById('recordingTimer').textContent = 
+                    `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            }, 1000);
+        }
+        
+        function stopRecordingTimer() {
+            if (recordingTimer) {
+                clearInterval(recordingTimer);
+                recordingTimer = null;
+            }
+            document.getElementById('recordingTimer').textContent = '00:00';
+        }
+        
+        async function playVoiceMessage(voiceId) {
+            socket.emit('get voice', voiceId, (voiceData) => {
+                if (voiceData) {
+                    const audio = new Audio(voiceData.data);
+                    audio.play();
+                }
+            });
+        }
+        
+        // ========== دوال مساعدة ==========
+        function playSound(type) {
+            if (!soundEnabled) return;
+            
+            const sounds = {
+                message: document.getElementById('messageSound'),
+                notification: document.getElementById('notificationSound'),
+                voice: document.getElementById('voiceMessageSound')
+            };
+            
+            if (sounds[type]) {
+                sounds[type].currentTime = 0;
+                sounds[type].play().catch(e => console.log('خطأ في تشغيل الصوت:', e));
+            }
+        }
+        
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            document.getElementById('soundStatus').textContent = soundEnabled ? '🔊' : '🔇';
+            playSound('notification');
+        }
+        
+        function toggleNotifications() {
+            notificationsEnabled = !notificationsEnabled;
+            document.getElementById('notifStatus').textContent = notificationsEnabled ? 'تشغيل' : 'إيقاف';
+        }
+        
+        function showNotification(title, body) {
+            if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification(title, { body: body, icon: 'https://arabic-chat.onrender.com/favicon.ico' });
+            }
+        }
+        
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 بايت';
+            const k = 1024;
+            const sizes = ['بايت', 'كيلوبايت', 'ميجابايت', 'جيجابايت'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+        
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+        
+        function toggleMuteUser(userId, isMuted) {
+            if (isMuted) {
+                socket.emit('unmute user', userId);
+            } else {
+                socket.emit('mute user', userId);
+            }
+        }
+        
+        function changeAvatar() {
+            document.getElementById('avatarUploadInput').click();
+        }
+        
+        function changeUsername() {
+            const newName = prompt('اسمك الجديد:', currentUser.username);
+            if (newName && newName.trim()) {
+                currentUser.username = newName.trim();
                 socket.emit('update profile', currentUser);
-                localStorage.setItem('chat_user', JSON.stringify(currentUser));
-                document.querySelector('.header h1').innerHTML = 
-                    `<i class="fas fa-comments"></i> شات عربي - ${currentUser.username}`;
-                alert('✅ تم تحديث ملفك الشخصي');
+                localStorage.setItem('arabic_chat_user', JSON.stringify(currentUser));
+                updateUserInterface();
             }
         }
         
-        // الاتصال بالسيرفر مباشرة إذا كان هناك مستخدم محفوظ
-        setTimeout(() => {
-            const savedUser = localStorage.getItem('chat_user');
-            if (savedUser) {
-                currentUser = JSON.parse(savedUser);
-                completeLogin();
+        function clearChat() {
+            if (confirm('هل تريد مسح كل الرسائل؟')) {
+                document.getElementById('messages').innerHTML = `
+                    <div class="message system">
+                        <div class="message-content">
+                            🧹 تم مسح المحادثة
+                        </div>
+                    </div>
+                `;
             }
-        }, 1000);
+        }
+        
+        // طلب صلاحيات الإشعارات
+        if ('Notification' in window && Notification.permission === 'default') {
+            Notification.requestPermission();
+        }
     </script>
 </body>
 </html>
