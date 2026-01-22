@@ -13,6 +13,9 @@
             --dark: #343a40;
             --warning: #ff9800;
             --danger: #dc3545;
+            --owner-color: #FFD700;
+            --minister-color: #9370DB;
+            --member-color: #6c757d;
         }
         
         * {
@@ -150,6 +153,39 @@
             background: linear-gradient(90deg, #ff9800, #f57c00);
         }
         
+        button.owner-btn {
+            background: linear-gradient(90deg, var(--owner-color), #FFC107);
+            color: #000;
+        }
+        
+        button.minister-btn {
+            background: linear-gradient(90deg, var(--minister-color), #8A2BE2);
+        }
+        
+        /* رموز الرتب */
+        .role-badge {
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            margin-right: 5px;
+            font-weight: bold;
+        }
+        
+        .role-owner {
+            background: var(--owner-color);
+            color: #000;
+        }
+        
+        .role-minister {
+            background: var(--minister-color);
+            color: white;
+        }
+        
+        .role-member {
+            background: var(--member-color);
+            color: white;
+        }
+        
         /* واجهة الشات */
         .chat-app {
             width: 100%;
@@ -211,6 +247,14 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
+        }
+        
+        .user-role-display {
+            font-size: 12px;
+            background: rgba(255,255,255,0.3);
+            padding: 2px 8px;
+            border-radius: 10px;
+            margin-right: 5px;
         }
         
         /* الإحصائيات */
@@ -294,6 +338,7 @@
             display: flex;
             align-items: center;
             gap: 10px;
+            flex: 1;
         }
         
         .user-avatar-small {
@@ -306,6 +351,7 @@
             justify-content: center;
             font-size: 16px;
             overflow: hidden;
+            flex-shrink: 0;
         }
         
         .user-avatar-small img {
@@ -314,25 +360,56 @@
             object-fit: cover;
         }
         
+        .user-details {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .user-name-role {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            margin-bottom: 3px;
+        }
+        
+        .user-name {
+            font-weight: bold;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
         .user-status {
             width: 10px;
             height: 10px;
             border-radius: 50%;
             background: #28a745;
+            flex-shrink: 0;
         }
         
         .user-status.muted {
             background: #dc3545;
         }
         
+        .promoted-by {
+            color: #6c757d;
+            font-size: 10px;
+            display: block;
+        }
+        
         .user-actions {
             display: flex;
-            gap: 5px;
+            gap: 3px;
+            flex-shrink: 0;
         }
         
         .user-actions button {
-            padding: 5px 10px;
+            width: 30px;
+            height: 30px;
+            padding: 0;
+            border-radius: 50%;
             font-size: 12px;
+            margin: 0;
         }
         
         /* منطقة الدردشة */
@@ -421,6 +498,9 @@
         .message-user {
             font-weight: bold;
             color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 5px;
         }
         
         .message-time {
@@ -647,7 +727,7 @@
             </button>
             
             <p style="margin-top:15px; color:#666; font-size:14px;">
-                يمكنك تغيير الاسم والصورة لاحقاً من ملفك الشخصي
+                <strong>ملاحظة:</strong> سجل باسم "المالك" لتكون صاحب الموقع
             </p>
         </div>
     </div>
@@ -660,10 +740,13 @@
                 <div class="user-avatar" id="headerAvatar">
                     👤
                 </div>
-                <span id="headerUsername">زائر</span>
+                <div>
+                    <span id="headerUsername">زائر</span>
+                    <div class="user-role-display" id="headerRole" style="display: none;"></div>
+                </div>
             </div>
-            <h1><i class="fas fa-comments"></i> شات عربي متكامل</h1>
-            <p>دردشة، صور، صوت، ومميزات متقدمة</p>
+            <h1><i class="fas fa-comments"></i> شات عربي - نظام الرتب</h1>
+            <p>مالك 🏆 | وزراء 👑 | أعضاء 👤</p>
         </div>
         
         <!-- الإحصائيات -->
@@ -677,9 +760,8 @@
                 <span id="connectionStatus">جارٍ الاتصال...</span>
             </div>
             <div>
-                <i class="fas fa-volume-up"></i>
-                <span id="soundStatus">🔊</span>
-                <button onclick="toggleSound()" style="padding:5px 10px; font-size:12px;">تشغيل/إيقاف</button>
+                <i class="fas fa-crown"></i>
+                <span id="userRoleDisplay">...</span>
             </div>
         </div>
         
@@ -703,6 +785,7 @@
                             👤
                         </div>
                         <strong id="sidebarUsername">زائر</strong>
+                        <div id="sidebarRole" style="margin-top:5px;"></div>
                     </div>
                     <button onclick="changeAvatar()" style="width:100%; margin-bottom:5px;">
                         <i class="fas fa-camera"></i> تغيير الصورة
@@ -712,15 +795,17 @@
                     </button>
                 </div>
                 
-                <!-- الإعدادات السريعة -->
+                <!-- إرشادات الرتب -->
                 <div class="sidebar-section">
-                    <h3><i class="fas fa-cogs"></i> الإعدادات</h3>
-                    <button onclick="toggleNotifications()" style="width:100%; margin-bottom:5px;">
-                        <i class="fas fa-bell"></i> الإشعارات: <span id="notifStatus">تشغيل</span>
-                    </button>
-                    <button onclick="clearChat()" style="width:100%;" class="warning">
-                        <i class="fas fa-trash"></i> مسح المحادثة
-                    </button>
+                    <h3><i class="fas fa-info-circle"></i> نظام الرتب</h3>
+                    <div style="font-size: 13px; line-height: 1.6;">
+                        <p><span class="role-badge role-owner">🏆 مالك</span> - يرقّي ويكتم ويخفض</p>
+                        <p><span class="role-badge role-minister">👑 وزير</span> - يكتم الأعضاء فقط</p>
+                        <p><span class="role-badge role-member">👤 عضو</span> - لا صلاحيات</p>
+                        <p style="margin-top:10px; color:#666; font-size:12px;">
+                            لتصبح مالكاً: سجل باسم "المالك"
+                        </p>
+                    </div>
                 </div>
             </div>
             
@@ -730,8 +815,8 @@
                 <div id="messages">
                     <div class="message system">
                         <div class="message-content">
-                            🌟 مرحباً بك في الشات العربي المتكامل!
-                            <br><small>يمكنك إرسال نصوص، صور، فيديوهات، ورسائل صوتية</small>
+                            🌟 مرحباً بك في الشات العربي مع نظام الرتب!
+                            <br><small>سجل باسم "المالك" لتحصل على صلاحيات الترقية والكتم</small>
                         </div>
                     </div>
                 </div>
@@ -814,7 +899,8 @@
             username: '',
             avatar: '👤',
             avatarImage: null,
-            id: null
+            id: null,
+            role: 'member'
         };
         let mediaRecorder = null;
         let audioChunks = [];
@@ -839,6 +925,7 @@
                 currentUser.username = parsed.username || 'زائر';
                 currentUser.avatar = parsed.avatar || '👤';
                 currentUser.avatarImage = parsed.avatarImage || null;
+                currentUser.role = parsed.role || 'member';
                 
                 document.getElementById('usernameInput').value = currentUser.username;
                 
@@ -938,7 +1025,9 @@
             
             // الترحيب
             socket.on('welcome', (data) => {
-                console.log('مرحباً بك:', data.message);
+                console.log('مرحباً بك! رتبتك:', data.yourRole);
+                currentUser.role = data.yourRole;
+                updateRoleDisplay();
                 updateUsersList(data.users);
                 
                 // عرض الرسائل القديمة
@@ -950,7 +1039,7 @@
                 const welcomeMsg = {
                     type: 'system',
                     user: 'النظام',
-                    text: `🌟 ${data.message}`,
+                    text: `🌟 ${data.message} (رتبتك: ${getRoleName(data.yourRole)})`,
                     time: new Date().toLocaleTimeString('ar-SA')
                 };
                 displayMessage(welcomeMsg);
@@ -967,7 +1056,7 @@
                 const joinMsg = {
                     type: 'system',
                     user: 'النظام',
-                    text: `🟢 ${user.username} انضم للشات`,
+                    text: `🟢 ${user.username} انضم للشات (${getRoleName(user.role)})`,
                     time: new Date().toLocaleTimeString('ar-SA')
                 };
                 displayMessage(joinMsg);
@@ -1023,10 +1112,11 @@
                 const msg = {
                     type: 'system',
                     user: 'النظام',
-                    text: `🔇 ${data.mutedBy} كتم ${data.userId === socket.id ? 'ك' : 'مستخدم'}`,
+                    text: `🔇 ${data.mutedBy} كتم مستخدم`,
                     time: new Date().toLocaleTimeString('ar-SA')
                 };
                 displayMessage(msg);
+                playSound('notification');
             });
             
             // مستخدم تم إلغاء كتمه
@@ -1034,10 +1124,40 @@
                 const msg = {
                     type: 'system',
                     user: 'النظام',
-                    text: `🔊 تم إلغاء كتم ${userId === socket.id ? 'ك' : 'مستخدم'}`,
+                    text: `🔊 تم إلغاء كتم مستخدم`,
                     time: new Date().toLocaleTimeString('ar-SA')
                 };
                 displayMessage(msg);
+            });
+            
+            // مستخدم تم ترقيته
+            socket.on('user promoted', (data) => {
+                const msg = {
+                    type: 'system',
+                    user: 'النظام',
+                    text: `🎉 ${data.promotedBy} رقّى ${data.username} لوزير 👑`,
+                    time: new Date().toLocaleTimeString('ar-SA')
+                };
+                displayMessage(msg);
+                playSound('notification');
+                alert(`🎉 تم ترقية ${data.username} لوزير!`);
+            });
+            
+            // مستخدم تم خفض رتبته
+            socket.on('user demoted', (data) => {
+                const msg = {
+                    type: 'system',
+                    user: 'النظام',
+                    text: `⬇️ ${data.demotedBy} خفض ${data.username} لعضو عادي`,
+                    time: new Date().toLocaleTimeString('ar-SA')
+                };
+                displayMessage(msg);
+                playSound('notification');
+            });
+            
+            // خطأ
+            socket.on('error', (message) => {
+                alert(message);
             });
         }
         
@@ -1076,6 +1196,36 @@
             updateAvatarDisplay(document.getElementById('sidebarAvatar'), currentUser);
         }
         
+        function updateRoleDisplay() {
+            const roleName = getRoleName(currentUser.role);
+            const roleClass = getRoleClass(currentUser.role);
+            
+            document.getElementById('userRoleDisplay').textContent = roleName;
+            document.getElementById('userRoleDisplay').className = `role-badge ${roleClass}`;
+            
+            document.getElementById('headerRole').textContent = roleName;
+            document.getElementById('headerRole').className = `role-badge ${roleClass}`;
+            document.getElementById('headerRole').style.display = 'inline-block';
+            
+            document.getElementById('sidebarRole').innerHTML = `<span class="role-badge ${roleClass}">${roleName}</span>`;
+        }
+        
+        function getRoleName(role) {
+            switch(role) {
+                case 'owner': return '🏆 المالك';
+                case 'minister': return '👑 الوزير';
+                default: return '👤 عضو';
+            }
+        }
+        
+        function getRoleClass(role) {
+            switch(role) {
+                case 'owner': return 'role-owner';
+                case 'minister': return 'role-minister';
+                default: return 'role-member';
+            }
+        }
+        
         function updateAvatarDisplay(element, user) {
             if (user.avatarImage) {
                 element.innerHTML = `<img src="${user.avatarImage}" alt="${user.username}">`;
@@ -1088,6 +1238,11 @@
             const usersList = document.getElementById('usersList');
             usersList.innerHTML = '';
             
+            if (users.length === 0) {
+                usersList.innerHTML = '<li style="text-align:center; color:#666;">لا يوجد مستخدمون متصلون</li>';
+                return;
+            }
+            
             users.forEach(user => {
                 const li = document.createElement('li');
                 
@@ -1098,14 +1253,46 @@
                 avatarDiv.className = 'user-avatar-small';
                 updateAvatarDisplay(avatarDiv, user);
                 
+                const detailsDiv = document.createElement('div');
+                detailsDiv.className = 'user-details';
+                
+                const nameRoleDiv = document.createElement('div');
+                nameRoleDiv.className = 'user-name-role';
+                
                 const nameSpan = document.createElement('span');
-                nameSpan.textContent = user.username + (user.id === socket.id ? ' (أنت)' : '');
+                nameSpan.className = 'user-name';
+                nameSpan.textContent = user.username;
+                
+                const roleSpan = document.createElement('span');
+                roleSpan.className = `role-badge ${getRoleClass(user.role)}`;
+                roleSpan.textContent = getRoleName(user.role).split(' ')[1];
+                
+                nameRoleDiv.appendChild(nameSpan);
+                nameRoleDiv.appendChild(roleSpan);
+                
+                if (user.id === socket.id) {
+                    const youSpan = document.createElement('span');
+                    youSpan.style.cssText = 'font-size:10px; color:#666; margin-right:5px;';
+                    youSpan.textContent = '(أنت)';
+                    nameRoleDiv.appendChild(youSpan);
+                }
+                
+                detailsDiv.appendChild(nameRoleDiv);
+                
+                if (user.promotedBy) {
+                    const promotedSpan = document.createElement('span');
+                    promotedSpan.className = 'promoted-by';
+                    promotedSpan.textContent = `↑ رفعه: ${user.promotedBy}`;
+                    detailsDiv.appendChild(promotedSpan);
+                }
+                
+                userInfo.appendChild(avatarDiv);
+                userInfo.appendChild(detailsDiv);
                 
                 const statusDiv = document.createElement('div');
                 statusDiv.className = `user-status ${user.isMuted ? 'muted' : ''}`;
+                statusDiv.title = user.isMuted ? 'مكوت' : 'نشط';
                 
-                userInfo.appendChild(avatarDiv);
-                userInfo.appendChild(nameSpan);
                 userInfo.appendChild(statusDiv);
                 
                 li.appendChild(userInfo);
@@ -1115,11 +1302,13 @@
                     const actionsDiv = document.createElement('div');
                     actionsDiv.className = 'user-actions';
                     
+                    // زر الرد
                     const replyBtn = document.createElement('button');
                     replyBtn.innerHTML = '<i class="fas fa-reply"></i>';
                     replyBtn.title = 'رد';
                     replyBtn.onclick = () => setReplyTo(user);
                     
+                    // زر الكتم/إلغاء الكتم
                     const muteBtn = document.createElement('button');
                     muteBtn.innerHTML = user.isMuted ? '<i class="fas fa-volume-up"></i>' : '<i class="fas fa-volume-mute"></i>';
                     muteBtn.title = user.isMuted ? 'إلغاء كتم' : 'كتم';
@@ -1128,11 +1317,55 @@
                     
                     actionsDiv.appendChild(replyBtn);
                     actionsDiv.appendChild(muteBtn);
+                    
+                    // زر الترقية (فقط للمالك وللأعضاء العاديين)
+                    if (currentUser.role === 'owner' && user.role === 'member') {
+                        const promoteBtn = document.createElement('button');
+                        promoteBtn.innerHTML = '<i class="fas fa-crown"></i>';
+                        promoteBtn.title = 'ترقية لوزير';
+                        promoteBtn.className = 'minister-btn';
+                        promoteBtn.onclick = () => promoteUser(user.id, user.username);
+                        actionsDiv.appendChild(promoteBtn);
+                    }
+                    
+                    // زر الخفض (فقط للمالك وللوزراء)
+                    if (currentUser.role === 'owner' && user.role === 'minister') {
+                        const demoteBtn = document.createElement('button');
+                        demoteBtn.innerHTML = '<i class="fas fa-arrow-down"></i>';
+                        demoteBtn.title = 'خفض لعضو';
+                        demoteBtn.className = 'danger';
+                        demoteBtn.onclick = () => demoteUser(user.id, user.username);
+                        actionsDiv.appendChild(demoteBtn);
+                    }
+                    
                     li.appendChild(actionsDiv);
                 }
                 
                 usersList.appendChild(li);
             });
+        }
+        
+        // ========== دوال نظام الرتب ==========
+        function promoteUser(userId, username) {
+            if (confirm(`هل تريد ترقية "${username}" لوزير؟\n\nالوزير سيتمكن من:\n• كتم الأعضاء العاديين\n• لا يمكن كتم المالك أو وزراء آخرين`)) {
+                socket.emit('promote to minister', userId);
+            }
+        }
+        
+        function demoteUser(userId, username) {
+            if (confirm(`هل تريد خفض "${username}" لعضو عادي؟\n\nسيخسر صلاحيات الوزير.`)) {
+                socket.emit('demote minister', userId);
+            }
+        }
+        
+        function toggleMuteUser(userId, isMuted) {
+            if (isMuted) {
+                socket.emit('unmute user', userId);
+            } else {
+                if (confirm('هل تريد كتم هذا المستخدم؟\n\nلن يتمكن من إرسال رسائل.')) {
+                    socket.emit('mute user', userId);
+                }
+            }
         }
         
         // ========== إدارة الرسائل ==========
@@ -1166,7 +1399,9 @@
                                 `<img src="${message.avatarImage}" alt="${message.user}">` : 
                                 message.avatar}
                         </div>
-                        <div class="message-user">${message.user}</div>
+                        <div class="message-user">
+                            ${message.user}
+                        </div>
                         <div class="message-time">${message.time}</div>
                     </div>
                 `;
@@ -1470,14 +1705,6 @@
             const mins = Math.floor(seconds / 60);
             const secs = Math.floor(seconds % 60);
             return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-        }
-        
-        function toggleMuteUser(userId, isMuted) {
-            if (isMuted) {
-                socket.emit('unmute user', userId);
-            } else {
-                socket.emit('mute user', userId);
-            }
         }
         
         function changeAvatar() {
