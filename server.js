@@ -88,7 +88,7 @@ io.on('connection', (socket) => {
     socket.emit('welcome', {
       message: `مرحباً ${newUser.username}!`,
       users: Object.values(users),
-      history: messageHistory.slice(-50)
+      history: messageHistory.slice(-50),
       yourRole: role
     });
     
