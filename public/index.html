@@ -30,6 +30,94 @@
             align-items: center;
         }
         
+        /* نافذة تسجيل الدخول */
+        .login-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        
+        .login-box {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            width: 400px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        
+        .login-box h2 {
+            color: var(--primary);
+            margin-bottom: 20px;
+        }
+        
+        .avatar-options {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 15px 0;
+            flex-wrap: wrap;
+        }
+        
+        .avatar-option {
+            font-size: 30px;
+            cursor: pointer;
+            padding: 10px;
+            border: 3px solid transparent;
+            border-radius: 50%;
+            transition: all 0.3s;
+            background: #f8f9fa;
+        }
+        
+        .avatar-option:hover {
+            transform: scale(1.1);
+        }
+        
+        .avatar-option.selected {
+            border-color: var(--primary);
+            background: #e8f5e9;
+        }
+        
+        input[type="text"] {
+            width: 100%;
+            padding: 12px 15px;
+            margin: 10px 0;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            font-size: 16px;
+            text-align: center;
+        }
+        
+        input[type="text"]:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        
+        button {
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 10px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin: 5px;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(46, 125, 50, 0.3);
+        }
+        
+        /* واجهة الشات */
         .chat-app {
             width: 100%;
             max-width: 1000px;
@@ -95,18 +183,18 @@
         }
         
         #usersList li {
-            padding: 8px 12px;
+            padding: 10px 12px;
             margin-bottom: 8px;
             background: white;
             border-radius: 8px;
             border: 1px solid #dee2e6;
             display: flex;
             align-items: center;
+            gap: 10px;
         }
         
-        #usersList li::before {
-            content: "🟢";
-            margin-left: 8px;
+        #usersList li .avatar {
+            font-size: 20px;
         }
         
         .chat-area {
@@ -124,7 +212,7 @@
         
         .message {
             background: white;
-            padding: 12px 16px;
+            padding: 15px;
             margin-bottom: 15px;
             border-radius: 15px;
             border: 1px solid #e0e0e0;
@@ -132,7 +220,7 @@
             max-width: 80%;
         }
         
-        .message.user {
+        .message.own {
             margin-right: auto;
             background: #e3f2fd;
             border-color: #bbdefb;
@@ -143,23 +231,42 @@
             border-color: #ffe0b2;
             text-align: center;
             max-width: 100%;
+            font-style: italic;
         }
         
-        .message .user-name {
+        .message .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+        
+        .message .avatar {
+            font-size: 24px;
+        }
+        
+        .message .username {
             color: var(--primary);
             font-weight: bold;
-            margin-bottom: 5px;
-        }
-        
-        .message .text {
-            margin-bottom: 5px;
-            line-height: 1.5;
         }
         
         .message .time {
             color: #666;
             font-size: 12px;
+            margin-right: auto;
+        }
+        
+        .message .text {
+            margin: 10px 0;
+            line-height: 1.5;
+            font-size: 15px;
+        }
+        
+        .message .date {
+            color: #888;
+            font-size: 11px;
             text-align: left;
+            margin-top: 5px;
         }
         
         .typing-indicator {
@@ -169,6 +276,7 @@
             font-size: 14px;
             background: #f8f9fa;
             border-top: 1px solid #dee2e6;
+            display: none;
         }
         
         .input-area {
@@ -177,9 +285,10 @@
             border-top: 1px solid #dee2e6;
             display: flex;
             gap: 10px;
+            align-items: center;
         }
         
-        input {
+        .input-area input {
             flex: 1;
             padding: 12px 16px;
             border: 2px solid #ddd;
@@ -188,25 +297,17 @@
             transition: border-color 0.3s;
         }
         
-        input:focus {
+        .input-area input:focus {
             outline: none;
             border-color: var(--secondary);
         }
         
-        button {
-            background: linear-gradient(90deg, var(--primary), var(--secondary));
-            color: white;
-            border: none;
-            padding: 12px 25px;
+        .profile-btn {
+            background: #6c757d;
+            padding: 10px 15px;
             border-radius: 10px;
-            font-size: 16px;
+            color: white;
             cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-        
-        button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(46, 125, 50, 0.3);
         }
         
         @media (max-width: 768px) {
@@ -221,11 +322,44 @@
             .message {
                 max-width: 90%;
             }
+            
+            .login-box {
+                width: 90%;
+                margin: 20px;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="chat-app">
+    <!-- نافذة تسجيل الدخول -->
+    <div id="loginModal" class="login-modal">
+        <div class="login-box">
+            <h2>🎭 اختر شخصيتك</h2>
+            <input type="text" id="usernameInput" placeholder="اسمك في الشات" value="زائر">
+            
+            <div class="avatar-options">
+                <div class="avatar-option selected" data-avatar="👤">👤</div>
+                <div class="avatar-option" data-avatar="👑">👑</div>
+                <div class="avatar-option" data-avatar="🦁">🦁</div>
+                <div class="avatar-option" data-avatar="🐯">🐯</div>
+                <div class="avatar-option" data-avatar="🦊">🦊</div>
+                <div class="avatar-option" data-avatar="🦉">🦉</div>
+                <div class="avatar-option" data-avatar="🐉">🐉</div>
+                <div class="avatar-option" data-avatar="🦄">🦄</div>
+            </div>
+            
+            <button onclick="completeLogin()" style="width:100%; padding:12px; margin-top:15px;">
+                🚀 دخول إلى الشات
+            </button>
+            
+            <p style="margin-top:15px; color:#666; font-size:14px;">
+                يمكنك تغيير الاسم والصورة لاحقاً
+            </p>
+        </div>
+    </div>
+    
+    <!-- واجهة الشات الرئيسية -->
+    <div class="chat-app" style="display: none;" id="chatApp">
         <div class="header">
             <h1><i class="fas fa-comments"></i> شات عربي مجاني</h1>
             <p>دردشة عربية حية - تواصل مع الأصدقاء الآن!</p>
@@ -234,38 +368,39 @@
         <div class="stats">
             <div>
                 <i class="fas fa-users"></i> 
-                <span id="onlineCount">1</span> متصلون
+                <span id="onlineCount">0</span> متصلون
             </div>
             <div>
                 <i class="fas fa-wifi"></i> 
-                <span id="connectionStatus">متصل</span>
+                <span id="connectionStatus">جارٍ الاتصال...</span>
+            </div>
+            <div class="profile-btn" onclick="showProfileMenu()">
+                <i class="fas fa-user"></i> الملف الشخصي
             </div>
         </div>
         
         <div class="main-content">
             <div class="users-sidebar">
-                <h3><i class="fas fa-user-friends"></i> المستخدمون المتصلون</h3>
+                <h3><i class="fas fa-user-friends"></i> المتصلون الآن</h3>
                 <ul id="usersList">
-                    <li>أنت</li>
+                    <li>جارٍ التحميل...</li>
                 </ul>
             </div>
             
             <div class="chat-area">
                 <div id="messages">
                     <div class="message system">
-                        <div class="text">🌟 مرحباً بك في الشات العربي! ابدأ بالدردشة الآن.</div>
-                        <div class="time" id="currentTime"></div>
+                        <div class="text">🌟 مرحباً بك في الشات العربي! قم بتسجيل الدخول للبدء.</div>
                     </div>
                 </div>
                 
-                <div class="typing-indicator" id="typingIndicator" style="display: none;">
+                <div class="typing-indicator" id="typingIndicator">
                     <span id="typingUser">مستخدم</span> يكتب...
                 </div>
                 
                 <div class="input-area">
-                    <input type="text" id="username" placeholder="اسمك (اختياري)" value="زائر">
-                    <input type="text" id="messageInput" placeholder="اكتب رسالتك هنا..." autocomplete="off">
-                    <button onclick="sendMessage()">
+                    <input type="text" id="messageInput" placeholder="اكتب رسالتك هنا..." autocomplete="off" disabled>
+                    <button onclick="sendMessage()" id="sendBtn" disabled>
                         <i class="fas fa-paper-plane"></i> إرسال
                     </button>
                 </div>
@@ -277,125 +412,256 @@
     <script>
         // الاتصال بالسيرفر
         const socket = io();
-        let typingTimeout;
         
-        // تحديث الوقت الحالي
-        function updateTime() {
-            const now = new Date();
-            document.getElementById('currentTime').textContent = 
-                now.toLocaleTimeString('ar-SA');
-        }
-        setInterval(updateTime, 1000);
-        updateTime();
+        // بيانات المستخدم الحالي
+        let currentUser = {
+            username: '',
+            avatar: '👤',
+            id: null
+        };
         
-        // تسجيل المستخدم عند الاتصال
-        socket.on('connect', () => {
-            const username = document.getElementById('username').value.trim() || 'زائر';
-            socket.emit('register', username);
-            document.getElementById('connectionStatus').textContent = 'متصل';
-            document.getElementById('connectionStatus').style.color = '#2E7D32';
-        });
+        // عناصر DOM
+        const loginModal = document.getElementById('loginModal');
+        const chatApp = document.getElementById('chatApp');
+        const usernameInput = document.getElementById('usernameInput');
+        const messageInput = document.getElementById('messageInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const onlineCount = document.getElementById('onlineCount');
+        const connectionStatus = document.getElementById('connectionStatus');
+        const usersList = document.getElementById('usersList');
+        const messagesDiv = document.getElementById('messages');
+        const typingIndicator = document.getElementById('typingIndicator');
+        const typingUser = document.getElementById('typingUser');
         
-        // تحديث عدد المستخدمين
-        socket.on('user count', (count) => {
-            document.getElementById('onlineCount').textContent = count;
-        });
+        // ============== إعدادات أولية ==============
         
-        // تحديث قائمة المستخدمين
-        socket.on('user list', (users) => {
-            const usersList = document.getElementById('usersList');
-            usersList.innerHTML = '<li>أنت</li>';
-            users.forEach(user => {
-                if (user !== (document.getElementById('username').value.trim() || 'زائر')) {
-                    const li = document.createElement('li');
-                    li.textContent = user;
-                    usersList.appendChild(li);
-                }
+        // اختيار الصورة الشخصية
+        document.querySelectorAll('.avatar-option').forEach(option => {
+            option.addEventListener('click', function() {
+                document.querySelectorAll('.avatar-option').forEach(opt => {
+                    opt.classList.remove('selected');
+                });
+                this.classList.add('selected');
+                currentUser.avatar = this.dataset.avatar;
             });
         });
         
-        // استقبال الرسائل
-        socket.on('chat message', (data) => {
-            const messagesDiv = document.getElementById('messages');
-            const messageDiv = document.createElement('div');
-            
-            messageDiv.className = `message ${data.type}`;
-            
-            if (data.type === 'user') {
-                messageDiv.innerHTML = `
-                    <div class="user-name">${data.user}</div>
-                    <div class="text">${data.message}</div>
-                    <div class="time">${data.time}</div>
-                `;
-            } else {
-                messageDiv.innerHTML = `
-                    <div class="text">${data.message}</div>
-                    <div class="time">${data.time}</div>
-                `;
+        // تحميل بيانات المستخدم السابقة
+        window.addEventListener('load', () => {
+            const savedUser = localStorage.getItem('chat_user');
+            if (savedUser) {
+                currentUser = JSON.parse(savedUser);
+                usernameInput.value = currentUser.username;
+                
+                // تحديد الصورة الشخصية المحفوظة
+                document.querySelectorAll('.avatar-option').forEach(opt => {
+                    if (opt.dataset.avatar === currentUser.avatar) {
+                        opt.classList.add('selected');
+                    }
+                });
             }
+        });
+        
+        // ============== إكمال تسجيل الدخول ==============
+        function completeLogin() {
+            const username = usernameInput.value.trim() || 'زائر';
+            currentUser.username = username;
+            currentUser.id = socket.id;
             
-            messagesDiv.appendChild(messageDiv);
-            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            // إخفاء نافذة الدخول
+            loginModal.style.display = 'none';
+            
+            // إظهار واجهة الشات
+            chatApp.style.display = 'flex';
+            
+            // إرسال بيانات المستخدم للسيرفر
+            socket.emit('register user', currentUser);
+            
+            // حفظ في localStorage
+            localStorage.setItem('chat_user', JSON.stringify(currentUser));
+            
+            // تفعيل إدخال الرسائل
+            messageInput.disabled = false;
+            sendBtn.disabled = false;
+            messageInput.focus();
+            
+            // تحديث العنوان
+            document.querySelector('.header h1').innerHTML = 
+                `<i class="fas fa-comments"></i> شات عربي - ${currentUser.username}`;
+        }
+        
+        // ============== أحداث Socket.io ==============
+        
+        // استقبال الترحيب من السيرفر
+        socket.on('welcome', (data) => {
+            console.log('مرحباً بك:', data.message);
+            connectionStatus.textContent = 'متصل';
+            connectionStatus.style.color = '#2E7D32';
+            
+            // تحديث عدد المستخدمين
+            onlineCount.textContent = data.users.length;
+            
+            // تحديث قائمة المستخدمين
+            updateUsersList(data.users);
+            
+            // عرض الرسائل القديمة
+            messagesDiv.innerHTML = '';
+            data.history.forEach(msg => {
+                displayMessage(msg);
+            });
+            
+            // إضافة رسالة ترحيب
+            const welcomeMsg = {
+                type: 'system',
+                text: `🌟 ${data.message}`,
+                time: new Date().toLocaleTimeString('ar-SA')
+            };
+            displayMessage(welcomeMsg);
+        });
+        
+        // تحديث قائمة المستخدمين
+        socket.on('users update', (users) => {
+            onlineCount.textContent = users.length;
+            updateUsersList(users);
+        });
+        
+        // مستخدم جديد انضم
+        socket.on('user joined', (user) => {
+            const joinMsg = {
+                type: 'system',
+                text: `🟢 ${user.username} انضم للشات`,
+                time: new Date().toLocaleTimeString('ar-SA')
+            };
+            displayMessage(joinMsg);
+        });
+        
+        // مستخدم غادر
+        socket.on('user left', (user) => {
+            const leaveMsg = {
+                type: 'system',
+                text: `🔴 ${user.username} غادر الشات`,
+                time: new Date().toLocaleTimeString('ar-SA')
+            };
+            displayMessage(leaveMsg);
+        });
+        
+        // استقبال رسالة جديدة
+        socket.on('new message', (message) => {
+            displayMessage(message);
         });
         
         // مؤشر الكتابة
-        socket.on('typing', (username) => {
-            const indicator = document.getElementById('typingIndicator');
-            document.getElementById('typingUser').textContent = username;
-            indicator.style.display = 'block';
+        socket.on('user typing', (username) => {
+            typingUser.textContent = username;
+            typingIndicator.style.display = 'block';
             
-            clearTimeout(typingTimeout);
-            typingTimeout = setTimeout(() => {
-                indicator.style.display = 'none';
+            clearTimeout(window.typingTimeout);
+            window.typingTimeout = setTimeout(() => {
+                typingIndicator.style.display = 'none';
             }, 3000);
         });
         
-        socket.on('stop typing', () => {
-            document.getElementById('typingIndicator').style.display = 'none';
+        // الاتصال
+        socket.on('connect', () => {
+            console.log('✅ متصل بالسيرفر');
         });
+        
+        // قطع الاتصال
+        socket.on('disconnect', () => {
+            connectionStatus.textContent = 'غير متصل';
+            connectionStatus.style.color = '#dc3545';
+        });
+        
+        // ============== دوال مساعدة ==============
+        
+        // تحديث قائمة المستخدمين
+        function updateUsersList(users) {
+            usersList.innerHTML = '';
+            users.forEach(user => {
+                const li = document.createElement('li');
+                li.innerHTML = `
+                    <span class="avatar">${user.avatar}</span>
+                    <span>${user.username}</span>
+                    ${user.id === socket.id ? '<small>(أنت)</small>' : ''}
+                `;
+                usersList.appendChild(li);
+            });
+        }
+        
+        // عرض رسالة
+        function displayMessage(msg) {
+            const msgDiv = document.createElement('div');
+            
+            if (msg.type === 'system') {
+                msgDiv.className = 'message system';
+                msgDiv.innerHTML = `
+                    <div class="text">${msg.text}</div>
+                    <div class="time">${msg.time || ''}</div>
+                `;
+            } else {
+                const isOwnMessage = msg.userId === socket.id;
+                msgDiv.className = `message ${isOwnMessage ? 'own' : ''}`;
+                msgDiv.innerHTML = `
+                    <div class="user-info">
+                        <span class="avatar">${msg.avatar || '👤'}</span>
+                        <span class="username">${msg.user || 'مجهول'}</span>
+                        <span class="time">${msg.time || ''}</span>
+                    </div>
+                    <div class="text">${msg.text}</div>
+                    <div class="date">${msg.date || ''}</div>
+                `;
+            }
+            
+            messagesDiv.appendChild(msgDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
         
         // إرسال رسالة
         function sendMessage() {
-            const messageInput = document.getElementById('messageInput');
-            const message = messageInput.value.trim();
+            const text = messageInput.value.trim();
             
-            if (message) {
-                socket.emit('chat message', { message: message });
+            if (text && currentUser.username) {
+                socket.emit('send message', { text: text });
                 messageInput.value = '';
-                socket.emit('stop typing');
+                socket.emit('typing'); // إيقاف مؤشر الكتابة
             }
         }
         
         // التعامل مع الكتابة
-        document.getElementById('messageInput').addEventListener('input', () => {
-            socket.emit('typing');
+        messageInput.addEventListener('input', () => {
+            if (messageInput.value.trim()) {
+                socket.emit('typing');
+            }
         });
         
-        document.getElementById('messageInput').addEventListener('keypress', (e) => {
+        // إرسال بالضغط على Enter
+        messageInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 sendMessage();
             }
         });
         
-        // تحديث الاسم
-        document.getElementById('username').addEventListener('change', function() {
-            const newName = this.value.trim() || 'زائر';
-            socket.emit('register', newName);
-        });
+        // عرض قائمة الملف الشخصي
+        function showProfileMenu() {
+            const newUsername = prompt('اسمك الجديد:', currentUser.username);
+            if (newUsername && newUsername.trim()) {
+                currentUser.username = newUsername.trim();
+                socket.emit('update profile', currentUser);
+                localStorage.setItem('chat_user', JSON.stringify(currentUser));
+                document.querySelector('.header h1').innerHTML = 
+                    `<i class="fas fa-comments"></i> شات عربي - ${currentUser.username}`;
+                alert('✅ تم تحديث ملفك الشخصي');
+            }
+        }
         
-        // التعامل مع انقطاع الاتصال
-        socket.on('disconnect', () => {
-            document.getElementById('connectionStatus').textContent = 'غير متصل';
-            document.getElementById('connectionStatus').style.color = '#dc3545';
-        });
-        
-        // عند إعادة الاتصال
-        socket.on('reconnect', () => {
-            const username = document.getElementById('username').value.trim() || 'زائر';
-            socket.emit('register', username);
-            document.getElementById('connectionStatus').textContent = 'متصل';
-            document.getElementById('connectionStatus').style.color = '#2E7D32';
-        });
+        // الاتصال بالسيرفر مباشرة إذا كان هناك مستخدم محفوظ
+        setTimeout(() => {
+            const savedUser = localStorage.getItem('chat_user');
+            if (savedUser) {
+                currentUser = JSON.parse(savedUser);
+                completeLogin();
+            }
+        }, 1000);
     </script>
 </body>
 </html>
