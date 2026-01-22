@@ -1,4 +1,4 @@
-/* ملف CSS منفصل لتنظيم الكود */
+/* ملف CSS رئيسي - إضافي */
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700&display=swap');
 
 :root {
@@ -58,4 +58,19 @@
 @keyframes typing {
     0%, 60%, 100% { transform: translateY(0); }
     30% { transform: translateY(-5px); }
+}
+
+/* حل مشكلة pulse-circle */
+.pulse-circle {
+    width: 20px;
+    height: 20px;
+    background: white;
+    border-radius: 50%;
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(0.8); opacity: 0.7; }
+    50% { transform: scale(1.2); opacity: 1; }
+    100% { transform: scale(0.8); opacity: 0.7; }
 }
