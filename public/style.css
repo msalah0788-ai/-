@@ -1,0 +1,61 @@
+/* ملف CSS منفصل لتنظيم الكود */
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700&display=swap');
+
+:root {
+    --primary: #2E7D32;
+    --secondary: #4CAF50;
+    --dark: #1B5E20;
+    --light: #E8F5E9;
+    --owner: #FFD700;
+    --minister: #9370DB;
+    --member: #6c757d;
+    --danger: #dc3545;
+    --warning: #ff9800;
+    --info: #17a2b8;
+    --bg-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+* {
+    font-family: 'Cairo', sans-serif;
+}
+
+/* أنيميشن للرسائل الجديدة */
+@keyframes newMessage {
+    0% { transform: translateY(10px); opacity: 0; }
+    100% { transform: translateY(0); opacity: 1; }
+}
+
+.message {
+    animation: newMessage 0.3s ease;
+}
+
+/* تأثيرات للرتب */
+.role-owner {
+    text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+}
+
+.role-minister {
+    text-shadow: 0 0 10px rgba(147, 112, 219, 0.5);
+}
+
+/* مؤشر الكتابة */
+.typing-dots {
+    display: inline-flex;
+    gap: 3px;
+}
+
+.typing-dots span {
+    width: 8px;
+    height: 8px;
+    background: var(--primary);
+    border-radius: 50%;
+    animation: typing 1.4s infinite;
+}
+
+.typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+.typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes typing {
+    0%, 60%, 100% { transform: translateY(0); }
+    30% { transform: translateY(-5px); }
+}
