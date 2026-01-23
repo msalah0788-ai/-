@@ -1045,7 +1045,7 @@ function showSessionNotification(user) {
   
   // أحداث الأزرار
   notification.querySelector('#continueSessionBtn').addEventListener('click', () => {
-    window.location.href = 'chat.html';
+    window.location.href = '/chat';
   });
   
   notification.querySelector('#logoutBtn').addEventListener('click', () => {
