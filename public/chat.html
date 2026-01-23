@@ -3,630 +3,369 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>شات متقدم - المحادثة</title>
-    <link rel="stylesheet" href="style.css">
+    <title>دردشة سوريا - الشات الرئيسي</title>
     <link rel="stylesheet" href="chat.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap" rel="stylesheet">
 </head>
-<body class="theme-light">
-    <!-- شريط التحميل -->
-    <div class="loading-bar" id="loadingBar"></div>
-    
-    <!-- نافذة التحميل -->
-    <div class="loading-overlay" id="loadingOverlay">
-        <div class="loading-content">
-            <div class="loading-spinner"></div>
-            <div class="loading-text">جاري تحميل الشات...</div>
-            <div class="loading-details" id="loadingDetails"></div>
+<body class="light-mode">
+    <!-- الشريط الجانبي للمستخدمين -->
+    <div class="sidebar" id="usersSidebar">
+        <div class="sidebar-header">
+            <h3><i class="fas fa-users"></i> الأعضاء</h3>
+            <button class="toggle-btn" id="toggleSidebar">
+                <i class="fas fa-chevron-right"></i>
+            </button>
+        </div>
+        
+        <!-- شريط البحث -->
+        <div class="search-box">
+            <input type="text" id="searchUsers" placeholder="بحث عن عضو...">
+            <i class="fas fa-search"></i>
+        </div>
+        
+        <!-- قائمة المتصلين -->
+        <div class="users-section">
+            <h4><i class="fas fa-circle online-dot"></i> المتصلون الآن <span class="badge" id="onlineCount">0</span></h4>
+            <div class="users-list" id="onlineUsers">
+                <!-- يتم ملؤها بالـ JavaScript -->
+            </div>
+        </div>
+        
+        <!-- قائمة غير المتصلين -->
+        <div class="users-section">
+            <h4><i class="fas fa-circle offline-dot"></i> غير المتصلين</h4>
+            <div class="users-list" id="offlineUsers">
+                <!-- يتم ملؤها بالـ JavaScript -->
+            </div>
         </div>
     </div>
     
-    <!-- إشعارات النظام -->
-    <div class="notifications-container" id="notificationsContainer"></div>
+    <!-- الشريط الجانبي للقوائم -->
+    <div class="sidebar right-sidebar" id="menuSidebar">
+        <div class="sidebar-header">
+            <h3><i class="fas fa-bars"></i> القوائم</h3>
+            <button class="toggle-btn" id="toggleMenu">
+                <i class="fas fa-chevron-left"></i>
+            </button>
+        </div>
+        
+        <!-- الأزرار السريعة -->
+        <div class="quick-actions">
+            <button class="menu-btn active" data-target="chat">
+                <i class="fas fa-comments"></i>
+                <span>الدردشة</span>
+            </button>
+            <button class="menu-btn" data-target="rich">
+                <i class="fas fa-crown"></i>
+                <span>الأثرياء</span>
+            </button>
+            <button class="menu-btn" data-target="active">
+                <i class="fas fa-fire"></i>
+                <span>المتفاعلون</span>
+            </button>
+            <button class="menu-btn" data-target="subscriptions">
+                <i class="fas fa-gem"></i>
+                <span>الاشتراكات</span>
+            </button>
+            <button class="menu-btn" data-target="wall">
+                <i class="fas fa-newspaper"></i>
+                <span>الحائط</span>
+            </button>
+        </div>
+        
+        <!-- محتوى القوائم -->
+        <div class="menu-content">
+            <!-- قائمة الأثرياء -->
+            <div class="menu-section" id="richSection">
+                <h4><i class="fas fa-crown"></i> قائمة الأثرياء</h4>
+                <div class="rich-list" id="richList">
+                    <!-- يتم ملؤها بالـ JavaScript -->
+                </div>
+            </div>
+            
+            <!-- قائمة المتفاعلين -->
+            <div class="menu-section" id="activeSection">
+                <h4><i class="fas fa-fire"></i> أكثر المتفاعلين</h4>
+                <div class="active-list" id="activeList">
+                    <!-- يتم ملؤها بالـ JavaScript -->
+                </div>
+            </div>
+            
+            <!-- الاشتراكات والمميزات -->
+            <div class="menu-section" id="subscriptionsSection">
+                <h4><i class="fas fa-gem"></i> شراء الرتب</h4>
+                <div class="subscription-options">
+                    <div class="subscription-option" data-role="ادمن">
+                        <div class="option-header">
+                            <i class="fas fa-shield-alt"></i>
+                            <h5>رتبة أدمن</h5>
+                        </div>
+                        <p>صلاحيات إدارية متقدمة</p>
+                        <div class="price-tag">
+                            <i class="fas fa-coins"></i>
+                            <span>20,000 ذهب</span>
+                        </div>
+                        <button class="buy-btn" data-role="ادمن">شراء الآن</button>
+                    </div>
+                    
+                    <div class="subscription-option" data-role="عضو مميز">
+                        <div class="option-header">
+                            <i class="fas fa-star"></i>
+                            <h5>عضو مميز</h5>
+                        </div>
+                        <p>مميزات خاصة وبروفايل متطور</p>
+                        <div class="price-tag">
+                            <i class="fas fa-coins"></i>
+                            <span>5,000 ذهب</span>
+                        </div>
+                        <button class="buy-btn" data-role="عضو مميز">شراء الآن</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- الحائط والإعلانات -->
+            <div class="menu-section" id="wallSection">
+                <h4><i class="fas fa-newspaper"></i> حائط الإعلانات</h4>
+                <div class="wall-content" id="wallContent">
+                    <!-- يتم ملؤها بالـ JavaScript -->
+                </div>
+            </div>
+        </div>
+    </div>
     
-    <!-- التأثيرات الخاصة -->
-    <div class="effects-container" id="effectsContainer"></div>
-    
-    <!-- الهيكل الرئيسي -->
-    <div class="chat-wrapper" id="chatWrapper">
-        <!-- الشريط العلوي -->
-        <header class="chat-header">
-            <!-- القائمة الجانبية اليسرى -->
-            <div class="header-left">
-                <button class="menu-btn" id="mainMenuBtn" title="القائمة الرئيسية">
+    <!-- المحتوى الرئيسي -->
+    <div class="main-content">
+        <!-- شريط التنقل العلوي -->
+        <nav class="navbar">
+            <div class="nav-left">
+                <button class="menu-toggle" id="mainMenuToggle">
                     <i class="fas fa-bars"></i>
                 </button>
-                
-                <div class="logo-small">
-                    <i class="fas fa-crown"></i>
-                    <span>شات متقدم</span>
+                <div class="logo">
+                    <i class="fas fa-comments"></i>
+                    <span>دردشة سوريا</span>
                 </div>
             </div>
             
-            <!-- معلومات الغرفة -->
-            <div class="header-center">
+            <div class="nav-center">
                 <div class="room-info">
-                    <div class="room-icon">
-                        <i class="fas fa-hashtag"></i>
-                    </div>
-                    <div class="room-details">
-                        <h3 class="room-name" id="currentRoomName">العمومية</h3>
-                        <div class="room-stats">
-                            <span class="online-count" id="onlineCount">
-                                <i class="fas fa-user"></i> <span>0</span> متصل
-                            </span>
-                            <span class="message-count">
-                                <i class="fas fa-comment"></i> <span id="messageCount">0</span>
-                            </span>
-                        </div>
-                    </div>
+                    <span class="room-name"># دردشة عامة</span>
+                    <span class="members-count">
+                        <i class="fas fa-users"></i>
+                        <span id="totalMembers">0</span>
+                    </span>
                 </div>
             </div>
             
-            <!-- الأزرار اليمنى -->
-            <div class="header-right">
-                <!-- زر الإشعارات -->
-                <button class="header-btn notification-btn" id="notificationsBtn" title="الإشعارات">
-                    <i class="fas fa-bell"></i>
-                    <span class="badge" id="notificationBadge">0</span>
-                </button>
-                
-                <!-- زر المحادثات الخاصة -->
-                <button class="header-btn private-btn" id="privateChatBtn" title="المحادثات الخاصة">
-                    <i class="fas fa-envelope"></i>
-                    <span class="badge" id="privateBadge">0</span>
-                </button>
-                
-                <!-- زر طلبات الصداقة -->
-                <button class="header-btn friends-btn" id="friendsBtn" title="طلبات الصداقة">
+            <div class="nav-right">
+                <!-- طلبات الصداقة -->
+                <button class="nav-btn" id="friendRequestsBtn">
                     <i class="fas fa-user-friends"></i>
-                    <span class="badge" id="friendsBadge">0</span>
+                    <span class="badge">0</span>
                 </button>
                 
-                <!-- زر الإعدادات -->
-                <button class="header-btn settings-btn" id="settingsBtn" title="الإعدادات">
+                <!-- الدردشة الخاصة -->
+                <button class="nav-btn" id="privateChatBtn">
+                    <i class="fas fa-comment-dots"></i>
+                </button>
+                
+                <!-- الإعدادات -->
+                <button class="nav-btn" id="settingsBtn">
                     <i class="fas fa-cog"></i>
                 </button>
                 
                 <!-- معلومات المستخدم -->
-                <div class="user-profile-btn" id="userProfileBtn">
-                    <div class="user-avatar-sm">
-                        <img id="userAvatarSm" src="" alt="">
-                        <span class="user-status" id="userStatus"></span>
-                    </div>
-                    <div class="user-info-sm">
-                        <div class="user-name-sm" id="userNameSm"></div>
-                        <div class="user-role-sm" id="userRoleSm"></div>
-                    </div>
-                    <i class="fas fa-chevron-down"></i>
-                </div>
-            </div>
-        </header>
-        
-        <!-- المحتوى الرئيسي -->
-        <main class="chat-main">
-            <!-- الشريط الجانبي الأيسر -->
-            <aside class="sidebar-left" id="sidebarLeft">
-                <!-- القائمة الرئيسية -->
-                <div class="sidebar-section">
-                    <h4 class="sidebar-title">القائمة الرئيسية</h4>
-                    <nav class="sidebar-nav">
-                        <a href="#" class="nav-item active" data-page="chat">
-                            <i class="fas fa-comments"></i>
-                            <span>المحادثة</span>
-                        </a>
-                        <a href="#" class="nav-item" data-page="wall" id="wallBtn">
-                            <i class="fas fa-newspaper"></i>
-                            <span>الحائط</span>
-                            <span class="nav-badge" id="wallBadge">0</span>
-                        </a>
-                        <a href="#" class="nav-item" data-page="active" id="activeListBtn">
-                            <i class="fas fa-fire"></i>
-                            <span>المتفاعلين</span>
-                        </a>
-                        <a href="#" class="nav-item" data-page="rich" id="richListBtn">
-                            <i class="fas fa-coins"></i>
-                            <span>الأثرياء</span>
-                        </a>
-                        <a href="#" class="nav-item" data-page="subscriptions" id="subscriptionsBtn">
-                            <i class="fas fa-gem"></i>
-                            <span>الاشتراكات</span>
-                        </a>
-                    </nav>
-                </div>
-                
-                <!-- الغرف -->
-                <div class="sidebar-section">
-                    <h4 class="sidebar-title">الغرف</h4>
-                    <div class="rooms-list" id="roomsList">
-                        <!-- سيتم ملؤها بالجافاسكريبت -->
-                    </div>
-                </div>
-                
-                <!-- زر إنشاء غرفة (للمشرفين فما فوق) -->
-                <div class="sidebar-section" id="createRoomSection" style="display: none;">
-                    <button class="btn-create-room" id="createRoomBtn">
-                        <i class="fas fa-plus-circle"></i>
-                        <span>إنشاء غرفة جديدة</span>
+                <div class="user-dropdown">
+                    <button class="user-btn" id="userDropdown">
+                        <img src="https://via.placeholder.com/40" alt="صورة البروفايل" class="profile-pic">
+                        <span class="username" id="currentUsername">زائر</span>
+                        <span class="user-role" id="currentUserRole">ضيف</span>
                     </button>
                 </div>
-            </aside>
-            
-            <!-- منطقة المحتوى المركزي -->
-            <div class="chat-content" id="chatContent">
-                <!-- منطقة الرسائل -->
-                <div class="messages-area" id="messagesArea">
-                    <div class="messages-container" id="messagesContainer">
-                        <!-- الرسائل تظهر هنا -->
-                    </div>
-                    
-                    <!-- مؤشر الكتابة -->
-                    <div class="typing-indicator" id="typingIndicator" style="display: none;">
-                        <div class="typing-dots">
-                            <div class="dot"></div>
-                            <div class="dot"></div>
-                            <div class="dot"></div>
-                        </div>
-                        <span id="typingText">يكتب الآن...</span>
-                    </div>
-                </div>
                 
-                <!-- منطقة إدخال الرسائل -->
-                <div class="input-area" id="inputArea">
-                    <!-- معاينة الرد -->
-                    <div class="reply-preview" id="replyPreview" style="display: none;">
-                        <div class="reply-info">
-                            <span class="reply-label">رد على:</span>
-                            <span class="reply-sender" id="replySender"></span>
-                            <span class="reply-message" id="replyMessage"></span>
-                        </div>
-                        <button class="cancel-reply" id="cancelReplyBtn">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                    
-                    <!-- أدوات الإدخال -->
-                    <div class="input-tools">
-                        <button class="input-btn emoji-btn" id="emojiBtn" title="الإيموجي">
-                            <i class="far fa-smile"></i>
-                        </button>
-                        <button class="input-btn attachment-btn" id="attachmentBtn" title="إرفاق ملف">
-                            <i class="fas fa-paperclip"></i>
-                        </button>
-                        <button class="input-btn mic-btn" id="micBtn" title="تسجيل صوتي">
-                            <i class="fas fa-microphone"></i>
-                        </button>
-                        <button class="input-btn theme-btn" id="themeBtn" title="تبديل الثيم">
-                            <i class="fas fa-moon"></i>
-                        </button>
-                    </div>
-                    
-                    <!-- حقل الإدخال -->
-                    <div class="message-input-wrapper">
-                        <div class="input-container">
-                            <textarea 
-                                id="messageInput" 
-                                placeholder="اكتب رسالتك هنا..." 
-                                rows="1"
-                                maxlength="1000"
-                            ></textarea>
-                            
-                            <!-- معاينة المرفقات -->
-                            <div class="attachments-preview" id="attachmentsPreview"></div>
-                            
-                            <!-- عداد الأحرف -->
-                            <div class="char-counter">
-                                <span id="charCount">0</span>/1000
-                            </div>
-                        </div>
-                        
-                        <!-- زر الإرسال -->
-                        <button class="send-btn" id="sendBtn" title="إرسال">
-                            <i class="fas fa-paper-plane"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- الشريط الجانبي الأيمن (قائمة الأعضاء) -->
-            <aside class="sidebar-right" id="sidebarRight">
-                <div class="sidebar-header">
-                    <h4 class="sidebar-title">
-                        <i class="fas fa-users"></i>
-                        الأعضاء المتصلين
-                    </h4>
-                    <div class="sidebar-actions">
-                        <button class="sidebar-action-btn" id="toggleOnlineOnly" title="المتصلين فقط">
-                            <i class="fas fa-wifi"></i>
-                        </button>
-                        <button class="sidebar-action-btn" id="refreshUsersBtn" title="تحديث">
-                            <i class="fas fa-sync-alt"></i>
-                        </button>
-                        <button class="sidebar-action-btn" id="toggleSidebarBtn" title="إخفاء القائمة">
-                            <i class="fas fa-chevron-left"></i>
-                        </button>
-                    </div>
-                </div>
-                
-                <!-- فلتر البحث -->
-                <div class="users-filter">
-                    <div class="search-box">
-                        <i class="fas fa-search"></i>
-                        <input type="text" id="usersSearch" placeholder="بحث عن عضو...">
-                        <button class="clear-search" id="clearSearchBtn" style="display: none;">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                    
-                    <!-- فلتر الرتب -->
-                    <div class="role-filter">
-                        <select id="roleFilter">
-                            <option value="all">جميع الرتب</option>
-                            <option value="مالك">المالك</option>
-                            <option value="اونر">الاونر</option>
-                            <option value="ادمن">الادمن</option>
-                            <option value="عضو مميز">عضو مميز</option>
-                            <option value="عضو">عضو</option>
-                            <option value="ضيف">ضيف</option>
-                        </select>
-                    </div>
-                </div>
-                
-                <!-- قائمة الأعضاء -->
-                <div class="users-list-container">
-                    <div class="users-list" id="usersList">
-                        <!-- سيتم ملؤها بالجافاسكريبت -->
-                    </div>
-                    
-                    <!-- رسالة عدم وجود أعضاء -->
-                    <div class="empty-users" id="emptyUsers" style="display: none;">
-                        <i class="fas fa-user-slash"></i>
-                        <p>لا يوجد أعضاء متصلين</p>
-                    </div>
-                </div>
-                
-                <!-- إحصائيات -->
-                <div class="users-stats">
-                    <div class="stat-item">
-                        <i class="fas fa-user-check"></i>
-                        <span class="stat-label">متصلين:</span>
-                        <span class="stat-value" id="connectedCount">0</span>
-                    </div>
-                    <div class="stat-item">
-                        <i class="fas fa-user-clock"></i>
-                        <span class="stat-label">غير متصلين:</span>
-                        <span class="stat-value" id="offlineCount">0</span>
-                    </div>
-                    <div class="stat-item">
-                        <i class="fas fa-users"></i>
-                        <span class="stat-label">المجموع:</span>
-                        <span class="stat-value" id="totalUsers">0</span>
-                    </div>
-                </div>
-            </aside>
-        </main>
-    </div>
-    
-    <!-- ====== النوافذ المنبثقة ====== -->
-    
-    <!-- نافذة الملف الشخصي -->
-    <div class="modal profile-modal" id="profileModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3><i class="fas fa-user-circle"></i> الملف الشخصي</h3>
-                <button class="modal-close" id="closeProfileModal">
-                    <i class="fas fa-times"></i>
+                <!-- تبديل الوضع -->
+                <button class="nav-btn" id="themeToggle">
+                    <i class="fas fa-moon"></i>
                 </button>
             </div>
-            <div class="modal-body">
-                <div class="profile-container" id="profileContainer">
-                    <!-- يتم ملؤها بالجافاسكريبت -->
+        </nav>
+        
+        <!-- منطقة الدردشة -->
+        <div class="chat-container">
+            <!-- رسائل الترحيب -->
+            <div class="welcome-messages">
+                <div class="welcome-message system">
+                    <div class="message-content">
+                        <i class="fas fa-heart"></i>
+                        <p>أهلاً وسهلاً بكم في دردشة سوريا</p>
+                        <p class="emoji-line">❤️❤️❤️❤️❤️❤️❤️❤️❤️❤️❤️</p>
+                    </div>
                 </div>
+            </div>
+            
+            <!-- قائمة الرسائل -->
+            <div class="messages-container" id="messagesContainer">
+                <!-- يتم إضافة الرسائل هنا -->
+            </div>
+            
+            <!-- أدوات الإرسال -->
+            <div class="message-input-container">
+                <!-- أزرار الوسائط -->
+                <div class="media-buttons">
+                    <button class="media-btn" title="إرفاق صورة" id="attachImage">
+                        <i class="fas fa-image"></i>
+                    </button>
+                    <button class="media-btn" title="إرفاق فيديو" id="attachVideo">
+                        <i class="fas fa-video"></i>
+                    </button>
+                    <button class="media-btn" title="إرفاق أغنية" id="attachAudio">
+                        <i class="fas fa-music"></i>
+                    </button>
+                    <button class="media-btn" title="رابط يوتيوب" id="attachYoutube">
+                        <i class="fab fa-youtube"></i>
+                    </button>
+                    <button class="media-btn" title="الميكروفون" id="toggleMic">
+                        <i class="fas fa-microphone"></i>
+                    </button>
+                    <button class="media-btn" title="تأثيرات خاصة" id="effectsBtn">
+                        <i class="fas fa-magic"></i>
+                    </button>
+                </div>
+                
+                <!-- حقل إدخال الرسالة -->
+                <div class="input-wrapper">
+                    <input type="text" 
+                           id="messageInput" 
+                           placeholder="اكتب رسالتك هنا..." 
+                           maxlength="500"
+                           autocomplete="off">
+                    <div class="input-actions">
+                        <button class="send-btn" id="sendMessage">
+                            <i class="fas fa-paper-plane"></i>
+                            <span>إرسال</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- إشارات خاصة -->
+                <div class="special-signals">
+                    <button class="signal-btn" data-signal="👋">👋</button>
+                    <button class="signal-btn" data-signal="❤️">❤️</button>
+                    <button class="signal-btn" data-signal="😂">😂</button>
+                    <button class="signal-btn" data-signal="🔥">🔥</button>
+                    <button class="signal-btn" data-signal="🎉">🎉</button>
+                    <button class="signal-btn" data-signal="🎁">🎁</button>
+                    <button class="signal-btn" data-signal="💎">💎</button>
+                    <button class="signal-btn" data-signal="👑">👑</button>
+                </div>
+            </div>
+            
+            <!-- الرد على رسالة -->
+            <div class="reply-preview" id="replyPreview">
+                <!-- يتم عرض الرد هنا -->
             </div>
         </div>
     </div>
     
-    <!-- نافذة تعديل الملف الشخصي -->
-    <div class="modal edit-profile-modal" id="editProfileModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3><i class="fas fa-edit"></i> تعديل الملف الشخصي</h3>
-                <button class="modal-close" id="closeEditProfileModal">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div class="edit-profile-container" id="editProfileContainer">
-                    <!-- يتم ملؤها بالجافاسكريبت -->
-                </div>
-            </div>
+    <!-- نافذة الدردشة الخاصة -->
+    <div class="private-chat-window" id="privateChatWindow">
+        <div class="private-header">
+            <h4><i class="fas fa-comment-dots"></i> دردشة خاصة</h4>
+            <button class="close-private" id="closePrivate">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="private-messages" id="privateMessages">
+            <!-- رسائل الدردشة الخاصة -->
+        </div>
+        <div class="private-input">
+            <input type="text" id="privateMessageInput" placeholder="اكتب رسالة خاصة...">
+            <button id="sendPrivateMessage">
+                <i class="fas fa-paper-plane"></i>
+            </button>
         </div>
     </div>
     
     <!-- نافذة الإعدادات -->
-    <div class="modal settings-modal" id="settingsModal">
-        <div class="modal-content">
-            <div class="modal-header">
+    <div class="settings-modal" id="settingsModal">
+        <div class="settings-content">
+            <div class="settings-header">
                 <h3><i class="fas fa-cog"></i> الإعدادات</h3>
-                <button class="modal-close" id="closeSettingsModal">
+                <button class="close-settings" id="closeSettings">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
-            <div class="modal-body">
-                <div class="settings-container" id="settingsContainer">
-                    <!-- يتم ملؤها بالجافاسكريبت -->
+            
+            <div class="settings-tabs">
+                <button class="tab-btn active" data-tab="profile">البروفايل</button>
+                <button class="tab-btn" data-tab="chat">إعدادات الدردشة</button>
+                <button class="tab-btn" data-tab="notifications">الإشعارات</button>
+                <button class="tab-btn" data-tab="security">الأمان</button>
+                <button class="tab-btn" data-tab="admin" id="adminTab">الإدارة</button>
+            </div>
+            
+            <div class="tab-content">
+                <!-- إعدادات البروفايل -->
+                <div class="tab-pane active" id="profileTab">
+                    <!-- محتوى إعدادات البروفايل -->
+                </div>
+                
+                <!-- إعدادات الدردشة -->
+                <div class="tab-pane" id="chatTab">
+                    <!-- محتوى إعدادات الدردشة -->
+                </div>
+                
+                <!-- إعدادات الإشعارات -->
+                <div class="tab-pane" id="notificationsTab">
+                    <!-- محتوى إعدادات الإشعارات -->
+                </div>
+                
+                <!-- إعدادات الأمان -->
+                <div class="tab-pane" id="securityTab">
+                    <!-- محتوى إعدادات الأمان -->
+                </div>
+                
+                <!-- إعدادات الإدارة -->
+                <div class="tab-pane" id="adminTabContent">
+                    <!-- محتوى إعدادات الإدارة -->
                 </div>
             </div>
         </div>
     </div>
     
-    <!-- نافذة الإشعارات -->
-    <div class="modal notifications-modal" id="notificationsModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3><i class="fas fa-bell"></i> الإشعارات</h3>
-                <div class="modal-actions">
-                    <button class="btn-small" id="markAllReadBtn">تعيين الكل كمقروء</button>
-                    <button class="btn-small btn-danger" id="clearNotificationsBtn">مسح الكل</button>
-                    <button class="modal-close" id="closeNotificationsModal">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-            </div>
-            <div class="modal-body">
-                <div class="notifications-list" id="notificationsList">
-                    <!-- يتم ملؤها بالجافاسكريبت -->
-                </div>
-            </div>
+    <!-- نافذة التأثيرات -->
+    <div class="effects-modal" id="effectsModal">
+        <!-- محتوى التأثيرات -->
+    </div>
+    
+    <!-- نافذة الذهب -->
+    <div class="gold-modal" id="goldModal">
+        <!-- محتوى الذهب -->
+    </div>
+    
+    <!-- نافذة البروفايل -->
+    <div class="profile-modal" id="profileModal">
+        <!-- محتوى البروفايل -->
+    </div>
+    
+    <!-- نافذة الإجراءات الإدارية -->
+    <div class="admin-actions-modal" id="adminActionsModal">
+        <!-- محتوى الإجراءات -->
+    </div>
+    
+    <!-- نافذة التحميل -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <p>جاري تحميل الدردشة...</p>
         </div>
     </div>
     
-    <!-- نافذة المحادثات الخاصة -->
-    <div class="modal private-chat-modal" id="privateChatModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3><i class="fas fa-envelope"></i> المحادثات الخاصة</h3>
-                <button class="modal-close" id="closePrivateChatModal">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div class="private-chats-container" id="privateChatsContainer">
-                    <!-- يتم ملؤها بالجافاسكريبت -->
-                </div>
-            </div>
-        </div>
-    </div>
+    <!-- تأثيرات دخول المستخدمين -->
+    <div id="userEffects"></div>
     
-    <!-- نافذة طلبات الصداقة -->
-    <div class="modal friends-modal" id="friendsModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3><i class="fas fa-user-friends"></i> طلبات الصداقة</h3>
-                <button class="modal-close" id="closeFriendsModal">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div class="friends-container" id="friendsContainer">
-                    <!-- يتم ملؤها بالجافاسكريبت -->
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- نافذة الحائط -->
-    <div class="modal wall-modal" id="wallModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3><i class="fas fa-newspaper"></i> حائط المنشورات</h3>
-                <button class="modal-close" id="closeWallModal">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div class="wall-container" id="wallContainer">
-                    <!-- يتم ملؤها بالجافاسكريبت -->
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- نافذة قائمة المتفاعلين -->
-    <div class="modal active-list-modal" id="activeListModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3><i class="fas fa-fire"></i> قائمة المتفاعلين</h3>
-                <button class="modal-close" id="closeActiveListModal">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div class="active-list-container" id="activeListContainer">
-                    <!-- يتم ملؤها بالجافاسكريبت -->
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- نافذة قائمة الأثرياء -->
-    <div class="modal rich-list-modal" id="richListModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3><i class="fas fa-coins"></i> قائمة الأثرياء</h3>
-                <button class="modal-close" id="closeRichListModal">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div class="rich-list-container" id="richListContainer">
-                    <!-- يتم ملؤها بالجافاسكريبت -->
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- نافذة الاشتراكات -->
-    <div class="modal subscriptions-modal" id="subscriptionsModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3><i class="fas fa-gem"></i> الاشتراكات والمميزات</h3>
-                <button class="modal-close" id="closeSubscriptionsModal">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div class="subscriptions-container" id="subscriptionsContainer">
-                    <!-- يتم ملؤها بالجافاسكريبت -->
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- نافذة إرسال ذهب (للمالك فقط) -->
-    <div class="modal send-gold-modal" id="sendGoldModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3><i class="fas fa-coins"></i> إرسال ذهب</h3>
-                <button class="modal-close" id="closeSendGoldModal">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div class="send-gold-container" id="sendGoldContainer">
-                    <!-- يتم ملؤها بالجافاسكريبت -->
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- نافذة إهداء رتبة (للأونر والمالك فقط) -->
-    <div class="modal gift-role-modal" id="giftRoleModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3><i class="fas fa-gift"></i> إهداء رتبة</h3>
-                <button class="modal-close" id="closeGiftRoleModal">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div class="gift-role-container" id="giftRoleContainer">
-                    <!-- يتم ملؤها بالجافاسكريبت -->
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- نافذة العقوبات (للمشرفين فما فوق) -->
-    <div class="modal punishments-modal" id="punishmentsModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3><i class="fas fa-gavel"></i> إدارة العقوبات</h3>
-                <button class="modal-close" id="closePunishmentsModal">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div class="punishments-container" id="punishmentsContainer">
-                    <!-- يتم ملؤها بالجافاسكريبت -->
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- نافذة سجل الأحداث (للمالك فقط) -->
-    <div class="modal system-logs-modal" id="systemLogsModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3><i class="fas fa-history"></i> سجل الأحداث</h3>
-                <button class="modal-close" id="closeSystemLogsModal">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div class="system-logs-container" id="systemLogsContainer">
-                    <!-- يتم ملؤها بالجافاسكريبت -->
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- نافذة إرفاق ملف -->
-    <div class="modal attachment-modal" id="attachmentModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3><i class="fas fa-paperclip"></i> إرفاق ملف</h3>
-                <button class="modal-close" id="closeAttachmentModal">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div class="attachment-container" id="attachmentContainer">
-                    <!-- يتم ملؤها بالجافاسكريبت -->
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- نافذة الإيموجي -->
-    <div class="modal emoji-modal" id="emojiModal">
-        <div class="modal-content">
-            <div class="modal-body">
-                <div class="emoji-container" id="emojiContainer">
-                    <!-- يتم ملؤها بالجافاسكريبت -->
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- نافذة تسجيل صوتي -->
-    <div class="modal recording-modal" id="recordingModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3><i class="fas fa-microphone"></i> تسجيل صوتي</h3>
-                <button class="modal-close" id="closeRecordingModal">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div class="recording-container" id="recordingContainer">
-                    <!-- يتم ملؤها بالجافاسكريبت -->
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- نافذة المعاينة (للصور والفيديوهات) -->
-    <div class="modal preview-modal" id="previewModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3><i class="fas fa-expand"></i> معاينة</h3>
-                <button class="modal-close" id="closePreviewModal">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div class="preview-container" id="previewContainer">
-                    <!-- يتم ملؤها بالجافاسكريبت -->
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- نافذة التأكيد -->
-    <div class="modal confirm-modal" id="confirmModal">
-        <div class="modal-content">
-            <div class="modal-body">
-                <div class="confirm-container" id="confirmContainer">
-                    <!-- يتم ملؤها بالجافاسكريبت -->
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- مكتبات خارجية -->
-    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
     <script src="chat.js"></script>
 </body>
 </html>
