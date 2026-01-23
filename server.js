@@ -1,317 +1,395 @@
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
+const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 
 const app = express();
 const server = http.createServer(app);
-const io = socketIo(server);
+const io = socketIo(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+});
 
-// بيانات التطبيق
-const users = {};
-const onlineUsers = {};
-const messages = { general: [] };
-const rooms = ['general'];
-const friendships = {};
-const userDataFile = 'users.json';
+// تمكين CORS
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// تحميل بيانات المستخدمين
-let userData = {};
-if (fs.existsSync(userDataFile)) {
-    userData = JSON.parse(fs.readFileSync(userDataFile, 'utf8'));
+// ملف بيانات المستخدمين
+const USERS_FILE = 'users.json';
+
+// تحميل أو إنشاء بيانات المستخدمين
+let usersData = {};
+if (fs.existsSync(USERS_FILE)) {
+  try {
+    usersData = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
+  } catch (error) {
+    console.error('خطأ في قراءة ملف المستخدمين:', error);
+    usersData = {};
+  }
 }
 
 // حفظ بيانات المستخدمين
-function saveUserData() {
-    fs.writeFileSync(userDataFile, JSON.stringify(userData, null, 2));
+function saveUsersData() {
+  try {
+    fs.writeFileSync(USERS_FILE, JSON.stringify(usersData, null, 2), 'utf8');
+  } catch (error) {
+    console.error('خطأ في حفظ ملف المستخدمين:', error);
+  }
 }
 
 // تهيئة المالك إذا لم يكن موجوداً
-if (!userData['mohammad']) {
-    userData['mohammad'] = {
-        password: 'aumsalah079',
-        gender: 'ذكر',
-        age: 30,
-        role: 'مالك',
-        joinDate: new Date().toISOString(),
-        interaction: 1000,
-        profilePic: 'https://ui-avatars.com/api/?name=محمد&background=FFD700&color=000&size=256',
-        profileColor: '#FFD700',
-        coverPhoto: '',
-        serial: 1,
-        friends: [],
-        friendRequests: [],
-        bio: 'مالك الشات',
-        status: 'نشط',
-        privateChatEnabled: true,
-        title: 'المؤسس'
-    };
-    saveUserData();
+if (!usersData['محمد']) {
+  usersData['محمد'] = {
+    password: 'aumsalah079',
+    gender: 'ذكر',
+    age: 30,
+    role: 'مالك',
+    joinDate: new Date().toISOString(),
+    interaction: 1500,
+    profilePic: 'https://api.dicebear.com/7.x/avataaars/svg?seed=محمد&backgroundColor=FFD700',
+    profileColor: '#FFD700',
+    coverPhoto: '',
+    serial: 1,
+    friends: [],
+    friendRequests: [],
+    bio: 'مالك ومؤسس الشات',
+    status: 'نشط',
+    privateChatEnabled: true,
+    title: 'المؤسس',
+    isOnline: false,
+    lastSeen: new Date().toISOString()
+  };
+  saveUsersData();
 }
 
-app.use(express.static(path.join(__dirname, 'public')));
-app.use(express.json());
+// المستخدمون المتصلون حالياً
+const connectedUsers = new Map();
+const onlineUsers = {};
 
-// API للتسجيل والدخول
+// مسارات API
+app.post('/api/check-username', (req, res) => {
+  const { username } = req.body;
+  const exists = !!usersData[username];
+  res.json({ exists });
+});
+
 app.post('/api/login', (req, res) => {
-    const { username, password } = req.body;
+  const { username, password } = req.body;
+  
+  if (usersData[username] && usersData[username].password === password) {
+    // تحديث حالة الاتصال
+    usersData[username].isOnline = true;
+    usersData[username].lastSeen = new Date().toISOString();
+    saveUsersData();
     
-    if (userData[username] && userData[username].password === password) {
-        res.json({ 
-            success: true, 
-            user: {
-                username,
-                role: userData[username].role,
-                gender: userData[username].gender,
-                profilePic: userData[username].profilePic,
-                profileColor: userData[username].profileColor,
-                serial: userData[username].serial
-            }
-        });
-    } else {
-        res.json({ success: false, message: 'اسم المستخدم أو كلمة السر غير صحيحة' });
-    }
+    res.json({
+      success: true,
+      user: {
+        username,
+        role: usersData[username].role,
+        gender: usersData[username].gender,
+        profilePic: usersData[username].profilePic,
+        profileColor: usersData[username].profileColor,
+        serial: usersData[username].serial,
+        age: usersData[username].age,
+        interaction: usersData[username].interaction,
+        bio: usersData[username].bio
+      }
+    });
+  } else {
+    res.json({ success: false, message: 'اسم المستخدم أو كلمة السر غير صحيحة' });
+  }
 });
 
 app.post('/api/register', (req, res) => {
-    const { username, password, gender, age } = req.body;
-    
-    if (userData[username]) {
-        res.json({ success: false, message: 'اسم المستخدم موجود مسبقاً' });
-    } else if (username.length < 3) {
-        res.json({ success: false, message: 'اسم المستخدم يجب أن يكون 3 أحرف على الأقل' });
-    } else if (password.length < 4) {
-        res.json({ success: false, message: 'كلمة السر يجب أن تكون 4 أحرف على الأقل' });
-    } else if (age < 13 || age > 100) {
-        res.json({ success: false, message: 'العمر يجب أن يكون بين 13 و 100 سنة' });
-    } else {
-        const serial = Object.keys(userData).length + 1;
-        const profilePic = `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=${gender === 'أنثى' ? 'FF69B4' : '1E90FF'}&color=fff&size=256`;
-        
-        userData[username] = {
-            password,
-            gender,
-            age: parseInt(age),
-            role: 'عضو',
-            joinDate: new Date().toISOString(),
-            interaction: 0,
-            profilePic,
-            profileColor: gender === 'أنثى' ? '#FF69B4' : '#1E90FF',
-            coverPhoto: '',
-            serial,
-            friends: [],
-            friendRequests: [],
-            bio: 'مرحباً! أنا جديد هنا.',
-            status: 'نشط',
-            privateChatEnabled: true,
-            title: ''
-        };
-        
-        saveUserData();
-        res.json({ 
-            success: true, 
-            user: {
-                username,
-                role: 'عضو',
-                gender,
-                profilePic,
-                profileColor: userData[username].profileColor,
-                serial
-            }
-        });
+  const { username, password, gender, age } = req.body;
+  
+  // التحقق من الشروط
+  if (usersData[username]) {
+    res.json({ success: false, message: 'اسم المستخدم موجود مسبقاً' });
+    return;
+  }
+  
+  if (username.length < 3) {
+    res.json({ success: false, message: 'اسم المستخدم يجب أن يكون 3 أحرف على الأقل' });
+    return;
+  }
+  
+  if (password.length < 4) {
+    res.json({ success: false, message: 'كلمة السر يجب أن تكون 4 أحرف على الأقل' });
+    return;
+  }
+  
+  if (age < 13 || age > 100) {
+    res.json({ success: false, message: 'العمر يجب أن يكون بين 13 و 100 سنة' });
+    return;
+  }
+  
+  // إنشاء رقم تسلسلي
+  const serial = Object.keys(usersData).length + 1;
+  
+  // إنشاء صورة بروفايل
+  const profilePic = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(username)}&backgroundColor=${gender === 'أنثى' ? 'FF69B4' : '1E90FF'}`;
+  
+  // إنشاء المستخدم
+  usersData[username] = {
+    password,
+    gender,
+    age: parseInt(age),
+    role: 'عضو',
+    joinDate: new Date().toISOString(),
+    interaction: 0,
+    profilePic,
+    profileColor: gender === 'أنثى' ? '#FF69B4' : '#1E90FF',
+    coverPhoto: '',
+    serial,
+    friends: [],
+    friendRequests: [],
+    bio: 'مرحباً! أنا جديد هنا.',
+    status: 'نشط',
+    privateChatEnabled: true,
+    title: '',
+    isOnline: true,
+    lastSeen: new Date().toISOString()
+  };
+  
+  saveUsersData();
+  
+  res.json({
+    success: true,
+    user: {
+      username,
+      role: 'عضو',
+      gender,
+      profilePic,
+      profileColor: usersData[username].profileColor,
+      serial,
+      age: usersData[username].age,
+      interaction: 0,
+      bio: usersData[username].bio
     }
+  });
 });
 
-// API للحصول على معلومات المستخدم
 app.get('/api/user/:username', (req, res) => {
-    const { username } = req.params;
-    if (userData[username]) {
-        const { password, ...userInfo } = userData[username];
-        res.json({ success: true, user: userInfo });
-    } else {
-        res.json({ success: false, message: 'المستخدم غير موجود' });
-    }
+  const { username } = req.params;
+  
+  if (usersData[username]) {
+    const { password, ...userInfo } = usersData[username];
+    res.json({ success: true, user: userInfo });
+  } else {
+    res.json({ success: false, message: 'المستخدم غير موجود' });
+  }
 });
 
-// API لتحديث البروفايل
+app.get('/api/all-users', (req, res) => {
+  const usersArray = Object.keys(usersData).map(username => {
+    const { password, ...userInfo } = usersData[username];
+    return { username, ...userInfo };
+  });
+  
+  res.json({ success: true, users: usersArray });
+});
+
 app.post('/api/update-profile', (req, res) => {
-    const { username, updates } = req.body;
-    
-    if (userData[username]) {
-        Object.keys(updates).forEach(key => {
-            if (key !== 'password' && key !== 'role' && key !== 'serial') {
-                userData[username][key] = updates[key];
-            }
-        });
-        saveUserData();
-        res.json({ success: true, message: 'تم تحديث البروفايل' });
-    } else {
-        res.json({ success: false, message: 'المستخدم غير موجود' });
-    }
+  const { username, updates } = req.body;
+  
+  if (usersData[username]) {
+    Object.keys(updates).forEach(key => {
+      if (key !== 'password' && key !== 'serial' && key !== 'role') {
+        usersData[username][key] = updates[key];
+      }
+    });
+    saveUsersData();
+    res.json({ success: true, message: 'تم تحديث البروفايل' });
+  } else {
+    res.json({ success: false, message: 'المستخدم غير موجود' });
+  }
 });
 
-// API لإدارة الرتب
-app.post('/api/manage-role', (req, res) => {
-    const { adminUsername, targetUsername, newRole } = req.body;
+app.post('/api/update-role', (req, res) => {
+  const { adminUsername, targetUsername, newRole } = req.body;
+  
+  if (!usersData[adminUsername] || !usersData[targetUsername]) {
+    return res.json({ success: false, message: 'المستخدم غير موجود' });
+  }
+  
+  const adminRole = usersData[adminUsername].role;
+  const targetRole = usersData[targetUsername].role;
+  
+  // صلاحيات المالك
+  if (adminRole === 'مالك') {
+    usersData[targetUsername].role = newRole;
     
-    if (!userData[adminUsername] || !userData[targetUsername]) {
-        return res.json({ success: false, message: 'المستخدم غير موجود' });
+    // تحديث لون البروفايل حسب الرتبة
+    const roleColors = {
+      'مالك': '#FFD700',
+      'وزير': '#9d4edd',
+      'وزيرة': '#9d4edd',
+      'عضو مميز': '#4cc9f0',
+      'عضو': '#1E90FF',
+      'زائر': '#6c757d'
+    };
+    
+    if (roleColors[newRole]) {
+      usersData[targetUsername].profileColor = roleColors[newRole];
     }
     
-    const adminRole = userData[adminUsername].role;
-    const targetRole = userData[targetUsername].role;
+    saveUsersData();
     
-    // صلاحيات تغيير الرتب
-    if (adminRole === 'مالك') {
-        // المالك يستطيع تغيير أي رتبة
-        userData[targetUsername].role = newRole;
-        
-        // تحديث لون البروفايل حسب الرتبة الجديدة
-        if (newRole === 'مالك') {
-            userData[targetUsername].profileColor = '#FFD700';
-        } else if (newRole === 'وزير' || newRole === 'وزيرة') {
-            userData[targetUsername].profileColor = '#9d4edd';
-        } else if (newRole === 'عضو مميز') {
-            userData[targetUsername].profileColor = '#4cc9f0';
-        }
-        
-        saveUserData();
-        
-        // إرسال إشعار للجميع
-        io.emit('role updated', {
-            targetUsername,
-            newRole,
-            by: adminUsername
-        });
-        
-        res.json({ success: true, message: `تم تحديث رتبة ${targetUsername} إلى ${newRole}` });
-    } else if (adminRole === 'وزير' || adminRole === 'وزيرة') {
-        // الوزير لا يستطيع تغيير رتبة المالك
-        if (targetRole === 'مالك') {
-            return res.json({ success: false, message: 'لا يمكنك تعديل رتبة المالك' });
-        }
-        userData[targetUsername].role = newRole;
-        saveUserData();
-        io.emit('role updated', { targetUsername, newRole, by: adminUsername });
-        res.json({ success: true, message: `تم تحديث رتبة ${targetUsername}` });
-    } else {
-        res.json({ success: false, message: 'ليس لديك الصلاحية لتغيير الرتب' });
+    // إرسال تحديث للمستخدم المتصل
+    const targetSocket = connectedUsers.get(targetUsername);
+    if (targetSocket) {
+      io.to(targetSocket).emit('role-updated', { newRole });
     }
+    
+    res.json({ success: true, message: `تم تحديث رتبة ${targetUsername} إلى ${newRole}` });
+  } else {
+    res.json({ success: false, message: 'ليس لديك صلاحية لتغيير الرتب' });
+  }
+});
+
+// تقديم الملفات الثابتة
+app.use(express.static(path.join(__dirname, 'public')));
+
+// جميع المسارات الأخرى تذهب للصفحة الرئيسية
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // Socket.io Events
 io.on('connection', (socket) => {
-    console.log('مستخدم جديد متصل:', socket.id);
+  console.log('مستخدم جديد متصل:', socket.id);
 
-    socket.on('join', (userData) => {
-        users[socket.id] = {
-            id: socket.id,
-            username: userData.username,
-            role: userData.role,
-            gender: userData.gender,
-            profilePic: userData.profilePic,
-            profileColor: userData.profileColor,
-            serial: userData.serial,
-            room: 'general',
-            isGuest: userData.isGuest || false
-        };
-
-        onlineUsers[userData.username] = {
-            ...users[socket.id],
-            lastSeen: new Date().toISOString()
-        };
-
-        socket.join('general');
-        
-        // إرسال إشعار دخول
-        io.emit('user joined', {
-            username: userData.username,
-            role: userData.role
-        });
-        
-        // تحديث قائمة المستخدمين
-        io.emit('update users', Object.values(onlineUsers));
+  socket.on('user-join', (userData) => {
+    const { username } = userData;
+    
+    // تخزين اتصال المستخدم
+    connectedUsers.set(username, socket.id);
+    onlineUsers[username] = {
+      ...userData,
+      socketId: socket.id,
+      joinTime: new Date().toISOString()
+    };
+    
+    // تحديث حالة الاتصال في قاعدة البيانات
+    if (usersData[username]) {
+      usersData[username].isOnline = true;
+      usersData[username].lastSeen = new Date().toISOString();
+      saveUsersData();
+    }
+    
+    // إشعار الجميع بدخول المستخدم
+    socket.broadcast.emit('user-joined', {
+      username,
+      role: userData.role,
+      profilePic: userData.profilePic
     });
+    
+    // إرسال قائمة المتصلين للجميع
+    io.emit('online-users-updated', Object.values(onlineUsers));
+    
+    // إرسال ترحيب للمستخدم الجديد
+    socket.emit('welcome', {
+      message: `مرحباً ${username}! تم الاتصال بنجاح.`,
+      users: Object.values(onlineUsers)
+    });
+  });
 
-    socket.on('send message', (data) => {
-        const user = users[socket.id];
-        if (!user) return;
-
-        const message = {
-            id: Date.now(),
-            username: user.username,
-            role: user.role,
-            gender: user.gender,
-            profilePic: user.profilePic,
-            text: data.text,
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            room: data.room || 'general'
-        };
-
-        // زيادة التفاعل للمستخدم
-        if (!user.isGuest && data.text.length >= 4) {
-            if (userData[user.username]) {
-                userData[user.username].interaction += 1;
-                saveUserData();
-            }
-        }
-
-        if (!messages[message.room]) messages[message.room] = [];
-        messages[message.room].push(message);
-
-        io.to(message.room).emit('receive message', message);
-        
-        // إرسال إشعار إذا تم منشن المستخدم
-        const mentionedUsers = data.text.match(/@(\w+)/g);
-        if (mentionedUsers) {
-            mentionedUsers.forEach(mention => {
-                const mentionedUsername = mention.substring(1);
-                if (userData[mentionedUsername]) {
-                    io.emit('user mentioned', {
-                        mentioned: mentionedUsername,
-                        by: user.username,
-                        message: data.text
-                    });
-                }
+  socket.on('send-message', (messageData) => {
+    const { username, text, room = 'general' } = messageData;
+    
+    if (!username || !text) return;
+    
+    const message = {
+      id: Date.now(),
+      username,
+      text,
+      room,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      userInfo: onlineUsers[username] || usersData[username] || { role: 'زائر', gender: 'ذكر' }
+    };
+    
+    // زيادة التفاعل إذا كان المستخدم مسجلاً
+    if (usersData[username] && text.length >= 4) {
+      usersData[username].interaction += 1;
+      saveUsersData();
+    }
+    
+    // إرسال الرسالة للغرفة
+    io.emit('new-message', message);
+    
+    // التحقق من المنشنات
+    const mentionMatch = text.match(/@(\w+)/g);
+    if (mentionMatch) {
+      mentionMatch.forEach(mention => {
+        const mentionedUser = mention.substring(1);
+        if (onlineUsers[mentionedUser]) {
+          const userSocket = connectedUsers.get(mentionedUser);
+          if (userSocket) {
+            io.to(userSocket).emit('mentioned', {
+              by: username,
+              message: text
             });
+          }
         }
-    });
+      });
+    }
+  });
 
-    socket.on('typing', (data) => {
-        const user = users[socket.id];
-        if (user) {
-            socket.broadcast.to(data.room || 'general').emit('user typing', {
-                username: user.username,
-                isTyping: data.isTyping
-            });
-        }
-    });
+  socket.on('typing', (data) => {
+    const { username, isTyping, room = 'general' } = data;
+    if (username) {
+      socket.broadcast.to(room).emit('user-typing', {
+        username,
+        isTyping
+      });
+    }
+  });
 
-    socket.on('disconnect', () => {
-        const user = users[socket.id];
-        if (user) {
-            // تحديث آخر ظهور
-            if (userData[user.username]) {
-                userData[user.username].lastSeen = new Date().toISOString();
-                saveUserData();
-            }
-            
-            // إزالة من المتصلين
-            delete onlineUsers[user.username];
-            
-            io.emit('user left', {
-                username: user.username,
-                role: user.role
-            });
-            
-            io.emit('update users', Object.values(onlineUsers));
-            delete users[socket.id];
-        }
-    });
+  socket.on('disconnect', () => {
+    // البحث عن المستخدم المتصل بهذا السوكيت
+    let disconnectedUser = null;
+    
+    for (const [username, socketId] of connectedUsers.entries()) {
+      if (socketId === socket.id) {
+        disconnectedUser = username;
+        break;
+      }
+    }
+    
+    if (disconnectedUser) {
+      // تحديث حالة الاتصال
+      if (usersData[disconnectedUser]) {
+        usersData[disconnectedUser].isOnline = false;
+        usersData[disconnectedUser].lastSeen = new Date().toISOString();
+        saveUsersData();
+      }
+      
+      // إزالة من القوائم
+      connectedUsers.delete(disconnectedUser);
+      delete onlineUsers[disconnectedUser];
+      
+      // إعلام الجميع بخروج المستخدم
+      io.emit('user-left', {
+        username: disconnectedUser
+      });
+      
+      // تحديث قائمة المتصلين
+      io.emit('online-users-updated', Object.values(onlineUsers));
+      
+      console.log(`المستخدم ${disconnectedUser} انقطع`);
+    }
+  });
 });
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-    console.log(`الخادم يعمل على المنفذ ${PORT}`);
+  console.log(`✅ الخادم يعمل على المنفذ ${PORT}`);
+  console.log(`🌐 افتح المتصفح على: http://localhost:${PORT}`);
 });
