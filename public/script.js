@@ -1,80 +1,71 @@
-// ==================== المتغيرات العامة ====================
-let socket = null;
-let currentUser = null;
-let currentScreen = 'start';
-
-// ==================== إدارة الشاشات ====================
+// ====== دوال إدارة الشاشات ======
 function showScreen(screenId) {
     // إخفاء جميع الشاشات
-    document.querySelectorAll('.screen').forEach(screen => {
+    const screens = document.querySelectorAll('.screen');
+    screens.forEach(screen => {
         screen.classList.remove('active');
     });
     
     // إظهار الشاشة المطلوبة
-    document.getElementById(screenId + 'Screen').classList.add('active');
-    currentScreen = screenId;
+    const targetScreen = document.getElementById(screenId + 'Screen');
+    if (targetScreen) {
+        targetScreen.classList.add('active');
+    } else {
+        console.error('الشاشة غير موجودة:', screenId);
+    }
 }
 
-// دوال إظهار الشاشات
+// دوال الاختصار
 function showStartScreen() { showScreen('start'); }
 function showLogin() { showScreen('login'); }
 function showRegister() { showScreen('register'); }
 function showGuestLogin() { showScreen('guest'); }
 
-// ==================== إشعارات ====================
-function showNotification(message, type = 'info', duration = 5000) {
+// ====== الإشعارات ======
+function showNotification(message, type = 'info') {
     const notificationArea = document.getElementById('notificationArea');
+    if (!notificationArea) {
+        console.log('Notification area not found');
+        return;
+    }
     
     const notification = document.createElement('div');
     notification.className = `notification ${type}`;
-    
-    // أيقونة حسب نوع الإشعار
-    const icons = {
-        'success': 'fas fa-check-circle',
-        'error': 'fas fa-exclamation-circle',
-        'warning': 'fas fa-exclamation-triangle',
-        'info': 'fas fa-info-circle'
-    };
-    
-    notification.innerHTML = `
-        <i class="${icons[type] || icons.info}"></i>
-        <span>${message}</span>
+    notification.textContent = message;
+    notification.style.cssText = `
+        background: ${type === 'error' ? '#f8d7da' : '#d4edda'};
+        color: ${type === 'error' ? '#721c24' : '#155724'};
+        padding: 15px;
+        margin: 10px;
+        border-radius: 5px;
+        border: 1px solid ${type === 'error' ? '#f5c6cb' : '#c3e6cb'};
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        z-index: 1000;
     `;
     
     notificationArea.appendChild(notification);
     
-    // إزالة الإشعار بعد المدة المحددة
     setTimeout(() => {
-        notification.style.animation = 'slideOut 0.3s ease';
-        setTimeout(() => {
-            if (notification.parentNode) {
-                notification.parentNode.removeChild(notification);
-            }
-        }, 300);
-    }, duration);
-    
-    // إضافة تأثير الخروج
-    const style = document.createElement('style');
-    style.innerHTML = `
-        @keyframes slideOut {
-            from { transform: translateX(0); opacity: 1; }
-            to { transform: translateX(-100%); opacity: 0; }
-        }
-    `;
-    document.head.appendChild(style);
+        notification.remove();
+    }, 5000);
 }
 
-// ==================== تسجيل الدخول ====================
+// ====== تسجيل الدخول ======
 document.getElementById('loginForm')?.addEventListener('submit', async function(e) {
     e.preventDefault();
+    console.log('Login form submitted');
     
-    const username = document.getElementById('loginUsername').value.trim();
-    const password = document.getElementById('loginPassword').value;
+    const username = document.getElementById('loginUsername')?.value;
+    const password = document.getElementById('loginPassword')?.value;
     
     if (!username || !password) {
         showNotification('يرجى ملء جميع الحقول', 'error');
         return;
     }
+    
+    showNotification('جاري تسجيل الدخول...', 'info');
     
     try {
         const response = await fetch('/api/login', {
@@ -86,14 +77,17 @@ document.getElementById('loginForm')?.addEventListener('submit', async function(
         });
         
         const data = await response.json();
+        console.log('Login response:', data);
         
         if (data.success) {
-            currentUser = data;
-            showNotification(`مرحباً ${data.username}!`, 'success');
+            showNotification(`مرحباً ${data.username}!`, 'info');
             
-            // الانتقال لصفحة الشات بعد 1 ثانية
+            // حفظ بيانات المستخدم
+            localStorage.setItem('user', JSON.stringify(data));
+            
+            // الانتقال للشات بعد ثانية
             setTimeout(() => {
-                window.location.href = '/chat.html';
+                window.location.href = '/chat';
             }, 1000);
             
         } else {
@@ -102,16 +96,17 @@ document.getElementById('loginForm')?.addEventListener('submit', async function(
         
     } catch (error) {
         console.error('Login error:', error);
-        showNotification('حدث خطأ في الاتصال بالخادم', 'error');
+        showNotification('خطأ في الاتصال بالخادم', 'error');
     }
 });
 
-// ==================== تسجيل حساب جديد ====================
+// ====== تسجيل حساب جديد ======
 document.getElementById('registerForm')?.addEventListener('submit', async function(e) {
     e.preventDefault();
+    console.log('Register form submitted');
     
-    const username = document.getElementById('regUsername').value.trim();
-    const password = document.getElementById('regPassword').value;
+    const username = document.getElementById('regUsername')?.value;
+    const password = document.getElementById('regPassword')?.value;
     const gender = document.querySelector('input[name="gender"]:checked')?.value;
     
     if (!username || !password || !gender) {
@@ -119,15 +114,12 @@ document.getElementById('registerForm')?.addEventListener('submit', async functi
         return;
     }
     
-    if (username.length < 3) {
-        showNotification('اسم المستخدم يجب أن يكون 3 أحرف على الأقل', 'error');
+    if (username === 'محمد') {
+        showNotification('هذا الاسم محجوز', 'error');
         return;
     }
     
-    if (password.length < 6) {
-        showNotification('كلمة المرور يجب أن تكون 6 أحرف على الأقل', 'error');
-        return;
-    }
+    showNotification('جاري إنشاء الحساب...', 'info');
     
     try {
         const response = await fetch('/api/register', {
@@ -139,13 +131,16 @@ document.getElementById('registerForm')?.addEventListener('submit', async functi
         });
         
         const data = await response.json();
+        console.log('Register response:', data);
         
         if (data.success) {
-            showNotification('تم إنشاء الحساب بنجاح! يمكنك الآن تسجيل الدخول', 'success');
+            showNotification('تم إنشاء الحساب بنجاح!', 'info');
             
-            // الانتقال لشاشة تسجيل الدخول بعد 2 ثانية
+            // تعبئة اسم المستخدم في شاشة الدخول
+            document.getElementById('loginUsername').value = username;
+            
+            // الانتقال لشاشة الدخول بعد 2 ثانية
             setTimeout(() => {
-                document.getElementById('loginUsername').value = username;
                 showLogin();
             }, 2000);
             
@@ -154,16 +149,17 @@ document.getElementById('registerForm')?.addEventListener('submit', async functi
         }
         
     } catch (error) {
-        console.error('Registration error:', error);
-        showNotification('حدث خطأ في الاتصال بالخادم', 'error');
+        console.error('Register error:', error);
+        showNotification('خطأ في الاتصال بالخادم', 'error');
     }
 });
 
-// ==================== الدخول كضيف ====================
+// ====== الدخول كضيف ======
 document.getElementById('guestForm')?.addEventListener('submit', async function(e) {
     e.preventDefault();
+    console.log('Guest form submitted');
     
-    const guestName = document.getElementById('guestName').value.trim();
+    const guestName = document.getElementById('guestName')?.value;
     const gender = document.querySelector('input[name="guestGender"]:checked')?.value;
     
     if (!guestName || !gender) {
@@ -171,58 +167,55 @@ document.getElementById('guestForm')?.addEventListener('submit', async function(
         return;
     }
     
-    // إنشاء مستخدم ضيف مؤقت
-    currentUser = {
+    if (guestName === 'محمد') {
+        showNotification('هذا الاسم محجوز', 'error');
+        return;
+    }
+    
+    // إنشاء مستخدم ضيف
+    const guestUser = {
+        success: true,
         userId: 'guest_' + Date.now(),
         username: guestName,
         role: 'guest',
         gender: gender,
-        avatar: 'default_avatar.png',
+        avatar: gender === 'male' ? '👤' : '👩',
         isGuest: true
     };
     
     // حفظ في localStorage
-    localStorage.setItem('guestUser', JSON.stringify(currentUser));
+    localStorage.setItem('user', JSON.stringify(guestUser));
     
-    showNotification(`مرحباً ${guestName}! (ضيف)`, 'success');
+    showNotification(`مرحباً ${guestName} (ضيف)!`, 'info');
     
-    // الانتقال لصفحة الشات بعد 1 ثانية
+    // الانتقال للشات
     setTimeout(() => {
-        window.location.href = '/chat.html';
+        window.location.href = '/chat';
     }, 1000);
 });
 
-// ==================== تحميل المستخدم الضيف من localStorage ====================
-function loadGuestUser() {
-    const savedGuest = localStorage.getItem('guestUser');
-    if (savedGuest) {
-        return JSON.parse(savedGuest);
-    }
-    return null;
-}
-
-// ==================== التهيئة عند تحميل الصفحة ====================
+// ====== التهيئة عند تحميل الصفحة ======
 document.addEventListener('DOMContentLoaded', function() {
-    // التحقق إذا كان هناك مستخدم ضيف محفوظ
-    const savedGuest = loadGuestUser();
-    if (savedGuest && window.location.pathname === '/') {
-        if (confirm(`هل تريد الاستمرار كـ ${savedGuest.username} (ضيف)؟`)) {
-            currentUser = savedGuest;
-            window.location.href = '/chat.html';
-        } else {
-            localStorage.removeItem('guestUser');
-        }
+    console.log('Page loaded');
+    
+    // تحميل المستخدم المحفوظ
+    const savedUser = localStorage.getItem('user');
+    if (savedUser) {
+        console.log('Found saved user:', JSON.parse(savedUser).username);
     }
     
-    // إضافة تأثيرات للخيارات
-    const optionCards = document.querySelectorAll('.option-card');
-    optionCards.forEach(card => {
-        card.addEventListener('mouseenter', function() {
-            this.style.transform = 'translateY(-5px)';
-        });
-        
-        card.addEventListener('mouseleave', function() {
-            this.style.transform = 'translateY(0)';
+    // إضافة أحداث للخيارات (لكن لا تعتمد عليها)
+    document.querySelectorAll('.option-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            console.log('Option button clicked');
         });
     });
+    
+    // ضمان أن الشاشة الأولى ظاهرة
+    const startScreen = document.getElementById('startScreen');
+    if (startScreen) {
+        startScreen.classList.add('active');
+    }
+    
+    console.log('Initialization complete');
 });
