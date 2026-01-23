@@ -236,8 +236,10 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// صفحة الشات (محمية بالتوكن)
+// صفحة الشات
 app.get('/chat', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'chat.html'));
+});
   // التحقق من وجود توكن في query string
   const token = req.query.token;
   
