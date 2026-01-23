@@ -7,13 +7,12 @@
     <link rel="stylesheet" href="chat.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
-<body>
+<body class="light">
     <div class="chat-container">
         <!-- الشريط الجانبي -->
         <aside class="sidebar">
             <div class="user-profile">
                 <img id="current-profile-pic" class="profile-pic" 
-                     onclick="zoomProfilePic(this)"
                      src="" alt="الصورة الشخصية">
                 <div class="profile-info">
                     <h3 id="current-username"></h3>
@@ -21,19 +20,37 @@
                 </div>
             </div>
             
-            <div class="online-users">
+            <!-- قائمة المتصلين - قابلة للطي -->
+            <div class="users-toggle" onclick="toggleUsersList('online')">
                 <h3><i class="fas fa-users"></i> الأعضاء المتصلين</h3>
-                <div class="user-list" id="online-users-list">
-                    <!-- سيتم ملؤها بالجافاسكريبت -->
-                </div>
+                <i class="fas fa-chevron-down"></i>
+            </div>
+            <div class="users-list" id="online-users-list">
+                <!-- سيتم ملؤها بالجافاسكريبت -->
             </div>
             
-            <div class="sidebar-footer">
-                <button class="action-btn" onclick="toggleTheme()" title="تغيير السمة">
+            <!-- قائمة جميع الأعضاء - قابلة للطي -->
+            <div class="users-toggle" onclick="toggleUsersList('all')" style="margin-top: 20px;">
+                <h3><i class="fas fa-address-book"></i> جميع الأعضاء</h3>
+                <i class="fas fa-chevron-down"></i>
+            </div>
+            <div class="users-list collapsed" id="all-users-list">
+                <!-- سيتم ملؤها بالجافاسكريبت -->
+            </div>
+            
+            <!-- الأزرار السريعة -->
+            <div class="quick-actions" style="padding: 15px;">
+                <button class="action-button" onclick="openThemeSelector()">
                     <i class="fas fa-palette"></i>
+                    <span>الثيمات</span>
                 </button>
-                <button class="action-btn" onclick="logout()" title="تسجيل الخروج">
+                <button class="action-button" onclick="openSettings()">
+                    <i class="fas fa-cog"></i>
+                    <span>الإعدادات</span>
+                </button>
+                <button class="action-button" onclick="logout()">
                     <i class="fas fa-sign-out-alt"></i>
+                    <span>خروج</span>
                 </button>
             </div>
         </aside>
@@ -51,11 +68,11 @@
                     <button class="action-btn" id="toggle-sidebar" title="إظهار/إخفاء الأعضاء">
                         <i class="fas fa-users"></i>
                     </button>
-                    <button class="action-btn" title="الإعدادات">
-                        <i class="fas fa-cog"></i>
+                    <button class="action-btn" onclick="openProfileModal(currentUser.username)" title="بروفايلك">
+                        <i class="fas fa-user"></i>
                     </button>
-                    <button class="action-btn" title="إنشاء غرفة جديدة">
-                        <i class="fas fa-plus"></i>
+                    <button class="action-btn" onclick="showTopInteractions()" title="الأكثر تفاعلاً">
+                        <i class="fas fa-trophy"></i>
                     </button>
                 </div>
             </header>
@@ -72,13 +89,19 @@
             <div class="chat-input-area">
                 <div class="input-container">
                     <textarea id="message-input" class="message-input" 
-                              placeholder="اكتب رسالتك هنا... (اضغط Enter للإرسال)" 
+                              placeholder="اكتب رسالتك هنا... (اضغط Enter للإرسال، @لذكر مستخدم)" 
                               rows="1"></textarea>
                     <button id="send-btn" class="send-btn" title="إرسال">
                         <i class="fas fa-paper-plane"></i>
                     </button>
                 </div>
                 
+                <!-- معاينة المرفقات -->
+                <div class="media-attachments" id="media-attachments">
+                    <!-- تظهر معاينات الملفات هنا -->
+                </div>
+                
+                <!-- أزرار الإجراءات -->
                 <div class="input-actions">
                     <button class="input-action" title="إرسال صورة">
                         <i class="fas fa-image"></i>
@@ -86,54 +109,69 @@
                     <button class="input-action" title="إرسال ملف">
                         <i class="fas fa-paperclip"></i>
                     </button>
-                    <button class="input-action" title="إرسال تعبير">
-                        <i class="fas fa-smile"></i>
-                    </button>
                     <button class="input-action" title="تسجيل صوتي">
                         <i class="fas fa-microphone"></i>
                     </button>
+                    <input type="file" id="file-input" accept=".pdf,.doc,.docx,.txt" style="display:none">
                 </div>
             </div>
         </main>
     </div>
 
-    <!-- شريط التنقل للجوال -->
-    <nav class="bottom-nav">
-        <button class="nav-btn active" onclick="showSection('chat')">
-            <i class="fas fa-comments"></i>
-        </button>
-        <button class="nav-btn" onclick="showSection('users')">
-            <i class="fas fa-users"></i>
-        </button>
-        <button class="nav-btn" onclick="showSection('profile')">
-            <i class="fas fa-user"></i>
-        </button>
-        <button class="nav-btn" onclick="showSection('rooms')">
-            <i class="fas fa-hashtag"></i>
-        </button>
-    </nav>
+    <!-- أداة اختيار الثيم -->
+    <div class="theme-selector" id="theme-selector">
+        <h4 style="margin-bottom:10px;">اختر الثيم</h4>
+        <div style="display:flex; flex-wrap:wrap; justify-content:center;">
+            <div class="theme-option" style="background:#f8f9fa;" onclick="changeTheme('light')" title="فاتح"></div>
+            <div class="theme-option" style="background:#212529;" onclick="changeTheme('dark')" title="داكن"></div>
+            <div class="theme-option" style="background:linear-gradient(135deg,#667eea,#764ba2);" onclick="changeTheme('purple')" title="بنفسجي"></div>
+            <div class="theme-option" style="background:linear-gradient(135deg,#f093fb,#f5576c);" onclick="changeTheme('pink')" title="وردي"></div>
+            <div class="theme-option" style="background:linear-gradient(135deg,#4facfe,#00f2fe);" onclick="changeTheme('blue')" title="أزرق"></div>
+        </div>
+    </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script src="chat.js"></script>
     <script>
         // وظائف إضافية
-        function toggleTheme() {
-            document.body.classList.toggle('dark-theme');
-            showNotification('تم تغيير السمة', 'success');
+        function toggleUsersList(type) {
+            const list = document.getElementById(`${type}-users-list`);
+            const toggle = event.currentTarget;
+            
+            list.classList.toggle('collapsed');
+            toggle.classList.toggle('collapsed');
+        }
+        
+        function openThemeSelector() {
+            const selector = document.getElementById('theme-selector');
+            selector.classList.toggle('active');
+        }
+        
+        function openSettings() {
+            alert('شاشة الإعدادات قريباً...');
+        }
+        
+        function showTopInteractions() {
+            alert('قائمة الأكثر تفاعلاً قريباً...');
         }
         
         function logout() {
-            localStorage.removeItem('chatUser');
-            window.location.href = 'index.html';
+            if (confirm('هل تريد تسجيل الخروج؟')) {
+                localStorage.removeItem('chatUser');
+                localStorage.removeItem('chatTheme');
+                window.location.href = 'index.html';
+            }
         }
         
-        function showSection(section) {
-            // إضافة وظيفة التنقل بين الأقسام
-            document.querySelectorAll('.nav-btn').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            event.target.classList.add('active');
-        }
+        // إغلاق القوائم عند النقر خارجها
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.theme-selector') && !e.target.closest('.action-button')) {
+                document.getElementById('theme-selector').classList.remove('active');
+            }
+            if (!e.target.closest('.emoji-picker') && !e.target.closest('.input-action')) {
+                document.getElementById('emoji-picker').classList.remove('active');
+            }
+        });
     </script>
 </body>
 </html>
