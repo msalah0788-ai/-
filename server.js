@@ -395,7 +395,7 @@ app.post('/api/login', async (req, res) => {
         }
         
         // التحقق من اسم المستخدم الموجود
-        const existingUser = await User.findOne({ username });
+        User.findOne({ username })
         if (existingUser) {
             return res.status(400).json({ error: 'اسم المستخدم موجود بالفعل' });
         }
