@@ -1,171 +1,200 @@
-let currentUser = null;
-let selectedGender = 'ذكر';
-
-function openModal(modalId) {
-    document.getElementById(modalId).classList.add('active');
-    document.getElementById('error-message').classList.remove('active');
-}
-
-function closeModal(modalId) {
-    document.getElementById(modalId).classList.remove('active');
-}
-
-function selectGender(gender) {
-    selectedGender = gender;
-    document.querySelectorAll('.gender-btn').forEach(btn => btn.classList.remove('active'));
-    event.target.closest('.gender-btn').classList.add('active');
-}
-
-async function checkUsername(username) {
-    try {
-        const response = await fetch('/api/check-username', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username })
-        });
-        return await response.json();
-    } catch (error) {
-        return { exists: false };
-    }
-}
-
-async function login() {
-    const username = document.getElementById('login-username').value.trim();
-    const password = document.getElementById('login-password').value;
-    const errorEl = document.getElementById('error-message');
-
-    if (!username || !password) {
-        errorEl.textContent = 'يرجى ملء جميع الحقول';
-        errorEl.classList.add('active');
-        return;
-    }
-
-    try {
-        const response = await fetch('/api/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password })
-        });
-
-        const data = await response.json();
-
-        if (data.success) {
-            currentUser = data.user;
-            localStorage.setItem('chatUser', JSON.stringify(currentUser));
-            window.location.href = 'chat.html';
-        } else {
-            errorEl.textContent = data.message;
-            errorEl.classList.add('active');
-        }
-    } catch (error) {
-        errorEl.textContent = 'خطأ في الاتصال بالخادم';
-        errorEl.classList.add('active');
-    }
-}
-
-async function register() {
-    const username = document.getElementById('register-username').value.trim();
-    const password = document.getElementById('register-password').value;
-    const confirmPassword = document.getElementById('register-confirm-password').value;
-    const age = document.getElementById('register-age').value;
-    const errorEl = document.getElementById('error-message');
-
-    if (!username || !password || !confirmPassword || !age) {
-        errorEl.textContent = 'يرجى ملء جميع الحقول';
-        errorEl.classList.add('active');
-        return;
-    }
-
-    if (password !== confirmPassword) {
-        errorEl.textContent = 'كلمات السر غير متطابقة';
-        errorEl.classList.add('active');
-        return;
-    }
-
-    if (age < 13 || age > 100) {
-        errorEl.textContent = 'العمر يجب أن يكون بين 13 و 100 سنة';
-        errorEl.classList.add('active');
-        return;
-    }
-
-    const checkResult = await checkUsername(username);
-    if (checkResult.exists) {
-        errorEl.textContent = 'اسم المستخدم موجود مسبقاً';
-        errorEl.classList.add('active');
-        return;
-    }
-
-    try {
-        const response = await fetch('/api/register', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                username, 
-                password, 
-                gender: selectedGender, 
-                age 
-            })
-        });
-
-        const data = await response.json();
-
-        if (data.success) {
-            currentUser = data.user;
-            localStorage.setItem('chatUser', JSON.stringify(currentUser));
-            window.location.href = 'chat.html';
-        } else {
-            errorEl.textContent = data.message;
-            errorEl.classList.add('active');
-        }
-    } catch (error) {
-        errorEl.textContent = 'خطأ في الاتصال بالخادم';
-        errorEl.classList.add('active');
-    }
-}
-
-function enterAsGuest() {
-    const username = document.getElementById('guest-username').value.trim();
+document.addEventListener('DOMContentLoaded', function() {
+    // عناصر DOM
+    const loginForm = document.getElementById('loginForm');
+    const registerForm = document.getElementById('registerForm');
+    const loginBtn = document.getElementById('loginBtn');
+    const registerBtn = document.getElementById('registerBtn');
+    const guestBtn = document.getElementById('guestBtn');
+    const checkUsernameBtn = document.getElementById('checkUsernameBtn');
+    const authTabs = document.querySelectorAll('.auth-tab');
+    const usernameStatus = document.getElementById('usernameStatus');
+    const registerUsername = document.getElementById('registerUsername');
     
-    if (!username) {
-        alert('يرجى إدخال اسم المستخدم');
-        return;
-    }
-
-    currentUser = {
-        username: username,
-        role: 'زائر',
-        gender: selectedGender,
-        profilePic: `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}&backgroundColor=${selectedGender === 'أنثى' ? 'FF69B4' : '1E90FF'}`,
-        profileColor: selectedGender === 'أنثى' ? '#FF69B4' : '#1E90FF',
-        serial: 0,
-        isGuest: true
-    };
-
-    localStorage.setItem('chatUser', JSON.stringify(currentUser));
-    window.location.href = 'chat.html';
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-    const savedUser = localStorage.getItem('chatUser');
-    if (savedUser) {
-        const user = JSON.parse(savedUser);
-        if (!user.isGuest) {
-            document.getElementById('login-username').value = user.username;
+    // تبديل بين تبويبات التسجيل/الدخول
+    authTabs.forEach(tab => {
+        tab.addEventListener('click', function() {
+            const tabName = this.getAttribute('data-tab');
+            
+            // تحديث التبويبات النشطة
+            authTabs.forEach(t => t.classList.remove('active'));
+            this.classList.add('active');
+            
+            // إظهار النموذج المناسب
+            document.querySelectorAll('.auth-form').forEach(form => {
+                form.classList.remove('active');
+            });
+            
+            document.getElementById(`${tabName}Form`).classList.add('active');
+        });
+    });
+    
+    // التحقق من اسم المستخدم
+    checkUsernameBtn.addEventListener('click', async function() {
+        const username = registerUsername.value.trim();
+        
+        if (!username) {
+            usernameStatus.textContent = 'يرجى إدخال اسم المستخدم';
+            usernameStatus.style.color = '#EF4444';
+            return;
         }
-    }
-
-    document.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            const activeModal = document.querySelector('.modal.active');
-            if (activeModal) {
-                if (activeModal.id === 'login-modal') {
-                    login();
-                } else if (activeModal.id === 'register-modal') {
-                    register();
-                } else if (activeModal.id === 'guest-modal') {
-                    enterAsGuest();
+        
+        if (username.length < 3) {
+            usernameStatus.textContent = 'اسم المستخدم يجب أن يكون 3 أحرف على الأقل';
+            usernameStatus.style.color = '#EF4444';
+            return;
+        }
+        
+        try {
+            checkUsernameBtn.disabled = true;
+            checkUsernameBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            
+            // في تطبيق حقيقي، هنا نرسل طلب للخادم للتحقق
+            // لمثالنا، سنستخدم تحقق بسيط
+            const reservedUsernames = ['admin', 'owner', 'moderator', 'زائر', 'مدير'];
+            
+            // محاكاة تأخير الشبكة
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            if (reservedUsernames.includes(username.toLowerCase())) {
+                usernameStatus.textContent = 'اسم المستخدم محجوز';
+                usernameStatus.style.color = '#EF4444';
+            } else {
+                usernameStatus.textContent = 'اسم المستخدم متاح';
+                usernameStatus.style.color = '#10B981';
+            }
+        } catch (error) {
+            usernameStatus.textContent = 'خطأ في التحقق';
+            usernameStatus.style.color = '#EF4444';
+        } finally {
+            checkUsernameBtn.disabled = false;
+            checkUsernameBtn.textContent = 'تحقق';
+        }
+    });
+    
+    // تسجيل الدخول
+    loginBtn.addEventListener('click', async function() {
+        const username = document.getElementById('loginUsername').value.trim();
+        const password = document.getElementById('loginPassword').value;
+        
+        if (!username || !password) {
+            alert('يرجى ملء جميع الحقول');
+            return;
+        }
+        
+        try {
+            loginBtn.disabled = true;
+            loginBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الدخول...';
+            
+            // محاكاة تسجيل الدخول
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // في تطبيق حقيقي، هنا نرسل طلب للخادم
+            // للتبسيط، سننتقل مباشرة للشات
+            localStorage.setItem('chatUsername', username);
+            localStorage.setItem('chatRole', 'member');
+            localStorage.setItem('chatColor', '#000000');
+            localStorage.setItem('chatFont', 'Cairo');
+            localStorage.setItem('chatFontSize', 'medium');
+            
+            // الانتقال لصفحة الشات
+            window.location.href = 'chat.html';
+            
+        } catch (error) {
+            alert('خطأ في تسجيل الدخول: ' + error.message);
+            loginBtn.disabled = false;
+            loginBtn.textContent = 'دخول';
+        }
+    });
+    
+    // إنشاء حساب
+    registerBtn.addEventListener('click', async function() {
+        const username = registerUsername.value.trim();
+        const password = document.getElementById('registerPassword').value;
+        const confirmPassword = document.getElementById('confirmPassword').value;
+        
+        if (!username || !password || !confirmPassword) {
+            alert('يرجى ملء جميع الحقول');
+            return;
+        }
+        
+        if (password !== confirmPassword) {
+            alert('كلمات المرور غير متطابقة');
+            return;
+        }
+        
+        if (password.length < 6) {
+            alert('كلمة المرور يجب أن تكون 6 أحرف على الأقل');
+            return;
+        }
+        
+        try {
+            registerBtn.disabled = true;
+            registerBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري إنشاء الحساب...';
+            
+            // محاكاة إنشاء حساب
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            
+            // في تطبيق حقيقي، هنا نرسل طلب للخادم
+            localStorage.setItem('chatUsername', username);
+            localStorage.setItem('chatRole', 'member');
+            localStorage.setItem('chatColor', '#3B82F6'); // لون افتراضي
+            localStorage.setItem('chatFont', 'Cairo');
+            localStorage.setItem('chatFontSize', 'medium');
+            localStorage.setItem('chatToken', 'mock-token-' + Date.now());
+            
+            // إظهار رسالة نجاح
+            alert('تم إنشاء حسابك بنجاح! يتم تسجيل دخولك تلقائياً.');
+            
+            // الانتقال لصفحة الشات
+            window.location.href = 'chat.html';
+            
+        } catch (error) {
+            alert('خطأ في إنشاء الحساب: ' + error.message);
+            registerBtn.disabled = false;
+            registerBtn.textContent = 'إنشاء حساب';
+        }
+    });
+    
+    // الدخول كزائر
+    guestBtn.addEventListener('click', function() {
+        localStorage.setItem('chatUsername', 'زائر' + Math.floor(Math.random() * 1000));
+        localStorage.setItem('chatRole', 'visitor');
+        localStorage.setItem('chatColor', '#6B7280');
+        localStorage.setItem('chatFont', 'Arial');
+        localStorage.setItem('chatFontSize', 'medium');
+        
+        // الانتقال لصفحة الشات
+        window.location.href = 'chat.html';
+    });
+    
+    // معاينة أسماء المستخدمين المدخلة
+    registerUsername.addEventListener('input', function() {
+        if (this.value.trim()) {
+            usernameStatus.textContent = '';
+        }
+    });
+    
+    // السماح بالضغط على Enter في حقول الإدخال
+    const inputs = document.querySelectorAll('input');
+    inputs.forEach(input => {
+        input.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                if (this.id === 'loginUsername' || this.id === 'loginPassword') {
+                    loginBtn.click();
+                } else if (this.id === 'registerUsername') {
+                    document.getElementById('registerPassword').focus();
+                } else if (this.id === 'registerPassword') {
+                    document.getElementById('confirmPassword').focus();
+                } else if (this.id === 'confirmPassword') {
+                    registerBtn.click();
                 }
             }
-        }
+        });
+    });
+    
+    // إضافة تأثيرات بصرية
+    const features = document.querySelectorAll('.feature');
+    features.forEach((feature, index) => {
+        feature.style.animationDelay = `${index * 0.1}s`;
     });
 });
