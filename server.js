@@ -1,300 +1,227 @@
-// ==================== استيراد المكتبات ====================
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
-const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
 const path = require('path');
-const cors = require('cors');
 
-// ==================== إعداد التطبيق ====================
 const app = express();
 const server = http.createServer(app);
+
+// إعداد Socket.io مع تحسينات
 const io = socketIo(server, {
-    cors: {
-        origin: "*",
-        methods: ["GET", "POST"]
-    }
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  },
+  pingTimeout: 60000, // زيادة وقت المهلة
+  pingInterval: 25000
 });
 
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// خدمة الملفات الثابتة
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ==================== قاعدة البيانات ====================
-mongoose.connect('mongodb://localhost:27017/chat_app', {
-    useNewUrlParser: true,
-    useUnifiedTopology: true
-})
-.then(() => console.log('✅ تم الاتصال بقاعدة البيانات'))
-.catch(err => console.log('❌ خطأ في الاتصال:', err));
+// إعداد JSON للطلبات
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// ==================== نماذج قاعدة البيانات ====================
+// تخزين المستخدمين والرسائل
+const users = new Map();
+const messageHistory = [];
 
-// نموذج المستخدم
-const userSchema = new mongoose.Schema({
-    serialNumber: { type: Number, unique: true },
-    username: { type: String, required: true, unique: true },
-    password: { type: String, required: true },
-    gender: { type: String, enum: ['male', 'female'], required: true },
-    role: { 
-        type: String, 
-        enum: ['owner', 'minister', 'premium_member', 'member', 'guest'],
-        default: 'member'
-    },
-    isOnline: { type: Boolean, default: false }
-});
-
-// نموذج الرسائل
-const messageSchema = new mongoose.Schema({
-    room: { type: String, default: 'general' },
-    sender: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    content: { type: String, required: true },
-    timestamp: { type: Date, default: Date.now }
-});
-
-const User = mongoose.model('User', userSchema);
-const Message = mongoose.model('Message', messageSchema);
-
-// ==================== إنشاء المستخدم الأساسي (المالك) ====================
-async function createOwnerUser() {
-    try {
-        const ownerExists = await User.findOne({ username: 'محمد' });
-        if (!ownerExists) {
-            const hashedPassword = await bcrypt.hash('aumsalah079', 10);
-            
-            const owner = new User({
-                serialNumber: 1,
-                username: 'محمد',
-                password: hashedPassword,
-                gender: 'male',
-                role: 'owner'
-            });
-            
-            await owner.save();
-            console.log('✅ تم إنشاء حساب المالك: محمد / aumsalah079');
-        } else {
-            console.log('✅ حساب محمد موجود بالفعل');
-        }
-    } catch (error) {
-        console.log('❌ خطأ في إنشاء المستخدم الأساسي:', error.message);
-    }
-}
-
-// ==================== Socket.io Events ====================
-const onlineUsers = new Map();
-
-io.on('connection', (socket) => {
-    console.log('👤 مستخدم جديد متصل:', socket.id);
-
-    socket.on('join', (userData) => {
-        onlineUsers.set(socket.id, userData);
-        socket.broadcast.emit('user joined', {
-            username: userData.username,
-            role: userData.role,
-            time: new Date().toLocaleTimeString()
-        });
-        io.emit('online users', Array.from(onlineUsers.values()));
-    });
-
-    socket.on('send message', (data) => {
-        io.emit('new message', {
-            username: data.username,
-            text: data.text,
-            time: new Date().toLocaleTimeString()
-        });
-    });
-
-    socket.on('disconnect', () => {
-        const user = onlineUsers.get(socket.id);
-        if (user) {
-            io.emit('user left', {
-                username: user.username,
-                time: new Date().toLocaleTimeString()
-            });
-            onlineUsers.delete(socket.id);
-            io.emit('online users', Array.from(onlineUsers.values()));
-        }
-    });
-});
-
-// ==================== Routes الأساسية ====================
+// صفحة الرئيسية
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// صفحة الدردشة
 app.get('/chat', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'chat.html'));
+  res.sendFile(path.join(__dirname, 'public', 'chat.html'));
 });
 
-// ==================== تسجيل الدخول ====================
-app.post('/api/login', async (req, res) => {
-    console.log('📩 طلب دخول وصل:', req.body.username);
+// API للحصول على معلومات السيرفر
+app.get('/api/info', (req, res) => {
+  res.json({
+    status: 'online',
+    users: users.size,
+    messages: messageHistory.length,
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Socket.io Events
+io.on('connection', (socket) => {
+  console.log(`✅ مستخدم متصل: ${socket.id}`);
+  
+  // تعيين اسم افتراضي للمستخدم
+  const defaultUsername = `مستخدم_${socket.id.substring(0, 5)}`;
+  
+  // تخزين بيانات المستخدم
+  users.set(socket.id, {
+    id: socket.id,
+    username: defaultUsername,
+    joinedAt: new Date(),
+    lastActivity: new Date()
+  });
+  
+  // ترحيب بالمستخدم الجديد
+  socket.emit('welcome', {
+    message: `🎉 مرحباً بك في شاتي!`,
+    username: defaultUsername,
+    userId: socket.id,
+    onlineUsers: Array.from(users.values()).map(u => ({
+      id: u.id,
+      username: u.username
+    }))
+  });
+  
+  // إرسال سجل الرسائل للمستخدم الجديد
+  if (messageHistory.length > 0) {
+    socket.emit('message history', messageHistory.slice(-50)); // آخر 50 رسالة
+  }
+  
+  // إعلام الآخرين بمستخدم جديد
+  socket.broadcast.emit('user joined', {
+    username: defaultUsername,
+    userId: socket.id,
+    time: new Date().toLocaleTimeString(),
+    onlineCount: users.size
+  });
+  
+  // تحديث عدد المستخدمين للجميع
+  io.emit('users update', {
+    count: users.size,
+    users: Array.from(users.values()).map(u => u.username)
+  });
+  
+  // استقبال رسالة جديدة
+  socket.on('chat message', (data) => {
+    const user = users.get(socket.id);
+    if (!user || !data || !data.message) return;
     
-    try {
-        const { username, password } = req.body;
-        
-        // خاص لحساب محمد
-        if (username === 'محمد') {
-            console.log('🔑 تحقق من حساب محمد');
-            
-            // البحث عن محمد في قاعدة البيانات
-            let user = await User.findOne({ username: 'محمد' });
-            
-            // إذا ما لقيناه، ننشئه
-            if (!user) {
-                console.log('🆕 محمد غير موجود، جاري إنشائه...');
-                const hashedPassword = await bcrypt.hash('aumsalah079', 10);
-                user = new User({
-                    serialNumber: 1,
-                    username: 'محمد',
-                    password: hashedPassword,
-                    gender: 'male',
-                    role: 'owner'
-                });
-                await user.save();
-                console.log('✅ تم إنشاء حساب محمد');
-            }
-            
-            // تحقق من الباسورد (محمد فقط)
-            if (password === 'aumsalah079') {
-                console.log('✅ كلمة السر صحيحة لمحمد');
-                console.log('✅ تم تسجيل دخول محمد:', user._id);
-                
-                return res.json({
-                    success: true,
-                    userId: user._id,
-                    username: user.username,
-                    role: user.role,
-                    gender: user.gender
-                });
-            } else {
-                console.log('❌ كلمة السر خاطئة لمحمد');
-                return res.json({ 
-                    success: false, 
-                    error: 'كلمة المرور غير صحيحة' 
-                });
-            }
-        }
-        
-        // باقي المستخدمين
-        console.log('🔍 البحث عن مستخدم:', username);
-        const user = await User.findOne({ username });
-        
-        if (!user) {
-            console.log('❌ المستخدم غير موجود:', username);
-            return res.json({ 
-                success: false, 
-                error: 'اسم المستخدم غير موجود' 
-            });
-        }
-        
-        console.log('🔐 التحقق من كلمة السر');
-        const validPassword = await bcrypt.compare(password, user.password);
-        
-        if (!validPassword) {
-            console.log('❌ كلمة السر خاطئة');
-            return res.json({ 
-                success: false, 
-                error: 'كلمة المرور غير صحيحة' 
-            });
-        }
-        
-        console.log('✅ تم تسجيل دخول:', username);
-        res.json({
-            success: true,
-            userId: user._id,
-            username: user.username,
-            role: user.role,
-            gender: user.gender
-        });
-        
-    } catch (error) {
-        console.error('🔥 خطأ في الدخول:', error);
-        res.json({ 
-            success: false, 
-            error: 'حدث خطأ في الخادم' 
-        });
-    }
-});
-
-// ==================== تسجيل حساب جديد ====================
-app.post('/api/register', async (req, res) => {
-    console.log('📝 طلب تسجيل جديد:', req.body.username);
+    // تنظيف وتأمين الرسالة
+    const cleanMessage = data.message.toString().trim().substring(0, 1000);
+    if (!cleanMessage) return;
     
-    try {
-        const { username, password, gender } = req.body;
-        
-        // تحقق من البيانات
-        if (!username || !password || !gender) {
-            return res.json({ 
-                success: false, 
-                error: 'جميع الحقول مطلوبة' 
-            });
-        }
-        
-        // ممنوع اسم محمد
-        if (username === 'محمد') {
-            return res.json({ 
-                success: false, 
-                error: 'هذا الاسم محجوز' 
-            });
-        }
-        
-        // التحقق من تكرار الاسم (دون حساسية لحالة الأحرف)
-        const existingUser = await User.findOne({ 
-            username: new RegExp('^' + username + '$', 'i')
-        });
-        
-        if (existingUser) {
-            return res.json({ 
-                success: false, 
-                error: 'اسم المستخدم موجود بالفعل، اختر اسماً آخر' 
-            });
-        }
-        
-        // الحصول على الرقم التسلسلي
-        const lastUser = await User.findOne().sort({ serialNumber: -1 });
-        const serialNumber = lastUser ? lastUser.serialNumber + 1 : 2;
-        
-        // تشفير كلمة المرور
-        const hashedPassword = await bcrypt.hash(password, 10);
-        
-        // إنشاء المستخدم الجديد
-        const newUser = new User({
-            serialNumber,
-            username,
-            password: hashedPassword,
-            gender,
-            role: 'member'
-        });
-        
-        await newUser.save();
-        console.log('✅ تم إنشاء حساب جديد:', username);
-        
-        res.json({ 
-            success: true, 
-            message: 'تم إنشاء الحساب بنجاح',
-            userId: newUser._id,
-            username: newUser.username,
-            role: newUser.role,
-            gender: newUser.gender
-        });
-        
-    } catch (error) {
-        console.error('🔥 خطأ في التسجيل:', error);
-        res.json({ 
-            success: false, 
-            error: 'حدث خطأ في الخادم' 
-        });
+    // تحديث آخر نشاط
+    user.lastActivity = new Date();
+    
+    // إنشاء كائن الرسالة
+    const messageObj = {
+      id: Date.now() + socket.id,
+      userId: socket.id,
+      username: user.username,
+      message: cleanMessage,
+      timestamp: new Date().toLocaleTimeString(),
+      fullTime: new Date().toLocaleString(),
+      type: 'message'
+    };
+    
+    // حفظ في السجل (الحد الأقصى 1000 رسالة)
+    messageHistory.push(messageObj);
+    if (messageHistory.length > 1000) {
+      messageHistory.shift();
     }
+    
+    console.log(`💬 ${user.username}: ${cleanMessage}`);
+    
+    // إرسال للجميع
+    io.emit('chat message', messageObj);
+  });
+  
+  // تغيير اسم المستخدم
+  socket.on('change username', (newUsername) => {
+    const user = users.get(socket.id);
+    if (!user || !newUsername || newUsername.trim().length < 2) return;
+    
+    const cleanUsername = newUsername.toString().trim().substring(0, 20);
+    const oldUsername = user.username;
+    user.username = cleanUsername;
+    
+    io.emit('username changed', {
+      userId: socket.id,
+      oldUsername: oldUsername,
+      newUsername: cleanUsername,
+      time: new Date().toLocaleTimeString()
+    });
+  });
+  
+  // طلب معلومات المستخدم
+  socket.on('get user info', () => {
+    const user = users.get(socket.id);
+    if (user) {
+      socket.emit('user info', {
+        id: user.id,
+        username: user.username,
+        joinedAt: user.joinedAt.toLocaleString(),
+        connectionTime: Math.floor((new Date() - user.joinedAt) / 1000)
+      });
+    }
+  });
+  
+  // إرسال رسالة خاصة (PM)
+  socket.on('private message', (data) => {
+    if (!data.to || !data.message) return;
+    
+    const sender = users.get(socket.id);
+    const receiverSocket = Array.from(users.keys())
+      .find(id => users.get(id).username === data.to);
+    
+    if (receiverSocket && sender) {
+      io.to(receiverSocket).emit('private message', {
+        from: sender.username,
+        message: data.message,
+        timestamp: new Date().toLocaleTimeString()
+      });
+      
+      socket.emit('private message sent', {
+        to: data.to,
+        message: data.message
+      });
+    }
+  });
+  
+  // ping/pong للحفاظ على الاتصال
+  socket.on('ping', () => {
+    socket.emit('pong', { timestamp: Date.now() });
+  });
+  
+  // فصل المستخدم
+  socket.on('disconnect', (reason) => {
+    const user = users.get(socket.id);
+    console.log(`❌ مستخدم انقطع: ${socket.id} - السبب: ${reason}`);
+    
+    if (user) {
+      // إعلام الآخرين
+      socket.broadcast.emit('user left', {
+        username: user.username,
+        userId: socket.id,
+        time: new Date().toLocaleTimeString(),
+        onlineCount: users.size - 1
+      });
+      
+      // حذف من القائمة
+      users.delete(socket.id);
+      
+      // تحديث عدد المستخدمين
+      io.emit('users update', {
+        count: users.size,
+        users: Array.from(users.values()).map(u => u.username)
+      });
+    }
+  });
+  
+  // معالجة الأخطاء
+  socket.on('error', (error) => {
+    console.error(`❌ خطأ في السوكت ${socket.id}:`, error);
+  });
 });
 
-// ==================== بدء الخادم ====================
-const PORT = process.env.PORT || 5000;
-
-server.listen(PORT, async () => {
-    console.log(`🚀 الخادم يعمل على المنفذ ${PORT}`);
-    await createOwnerUser();
+// تشغيل السيرفر
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log('='.repeat(50));
+  console.log(`🚀 السيرفر يعمل على: http://localhost:${PORT}`);
+  console.log(`📁 الملفات الثابتة من: ${path.join(__dirname, 'public')}`);
+  console.log(`⏰ الوقت: ${new Date().toLocaleString()}`);
+  console.log('='.repeat(50));
 });
