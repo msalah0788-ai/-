@@ -3,20 +3,207 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>شات</title>
+    <title>شات متقدم - الرئيسية</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap" rel="stylesheet">
 </head>
-<body>
-    <div class="chat-container">
-        <h1>شات</h1>
-        <div id="messages"></div>
-        <div>
-            <input type="text" id="messageInput" placeholder="اكتب رسالة...">
-            <button id="sendButton">إرسال</button>
+<body class="theme-default">
+    <div class="main-container">
+        <!-- شاشة البداية -->
+        <div id="startScreen" class="screen active">
+            <div class="welcome-card">
+                <div class="logo">
+                    <i class="fas fa-comments"></i>
+                    <h1>شات متقدم</h1>
+                </div>
+                
+                <div class="welcome-text">
+                    <p>مرحباً بك في منصة الشات المتقدمة</p>
+                    <p class="sub-text">اختر طريقة الدخول المناسبة لك</p>
+                </div>
+                
+                <div class="options-container">
+                    <!-- الخيار 1: دخول الأعضاء -->
+                    <div class="option-card" id="loginOption">
+                        <div class="option-icon">
+                            <i class="fas fa-sign-in-alt"></i>
+                        </div>
+                        <h3>دخول الأعضاء</h3>
+                        <p>الدخول بحسابك المسجل مسبقاً</p>
+                        <button class="option-btn" onclick="showLogin()">
+                            دخول <i class="fas fa-arrow-left"></i>
+                        </button>
+                    </div>
+                    
+                    <!-- الخيار 2: تسجيل حساب جديد -->
+                    <div class="option-card" id="registerOption">
+                        <div class="option-icon">
+                            <i class="fas fa-user-plus"></i>
+                        </div>
+                        <h3>تسجيل حساب جديد</h3>
+                        <p>انضم إلينا وتمتع بجميع الميزات</p>
+                        <button class="option-btn" onclick="showRegister()">
+                            تسجيل <i class="fas fa-arrow-left"></i>
+                        </button>
+                    </div>
+                    
+                    <!-- الخيار 3: الدخول كضيف -->
+                    <div class="option-card" id="guestOption">
+                        <div class="option-icon">
+                            <i class="fas fa-user-clock"></i>
+                        </div>
+                        <h3>الدخول كضيف</h3>
+                        <p>الدردشة بدون تسجيل (ميزات محدودة)</p>
+                        <button class="option-btn" onclick="showGuestLogin()">
+                            دخول كضيف <i class="fas fa-arrow-left"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="owner-info">
+                    <p><i class="fas fa-crown"></i> مالك الموقع: محمد</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- شاشة تسجيل الدخول -->
+        <div id="loginScreen" class="screen">
+            <div class="form-card">
+                <button class="back-btn" onclick="showStartScreen()">
+                    <i class="fas fa-arrow-right"></i> رجوع
+                </button>
+                
+                <h2><i class="fas fa-sign-in-alt"></i> تسجيل الدخول</h2>
+                
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label for="loginUsername"><i class="fas fa-user"></i> اسم المستخدم</label>
+                        <input type="text" id="loginUsername" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="loginPassword"><i class="fas fa-lock"></i> كلمة المرور</label>
+                        <input type="password" id="loginPassword" required>
+                    </div>
+                    
+                    <button type="submit" class="submit-btn">
+                        <i class="fas fa-sign-in-alt"></i> دخول
+                    </button>
+                    
+                    <div class="form-footer">
+                        <p>ليس لديك حساب؟ <a href="#" onclick="showRegister()">سجل الآن</a></p>
+                    </div>
+                </form>
+                
+                <div class="demo-account">
+                    <p><strong>حساب تجريبي:</strong> محمد / aumsalah079</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- شاشة تسجيل حساب جديد -->
+        <div id="registerScreen" class="screen">
+            <div class="form-card">
+                <button class="back-btn" onclick="showStartScreen()">
+                    <i class="fas fa-arrow-right"></i> رجوع
+                </button>
+                
+                <h2><i class="fas fa-user-plus"></i> تسجيل حساب جديد</h2>
+                
+                <form id="registerForm">
+                    <div class="form-group">
+                        <label for="regUsername"><i class="fas fa-user"></i> اسم المستخدم</label>
+                        <input type="text" id="regUsername" required minlength="3">
+                        <small>يجب أن يكون الاسم فريداً ويتكون من 3 أحرف على الأقل</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="regPassword"><i class="fas fa-lock"></i> كلمة المرور</label>
+                        <input type="password" id="regPassword" required minlength="6">
+                        <small>6 أحرف على الأقل</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label><i class="fas fa-venus-mars"></i> الجنس</label>
+                        <div class="gender-options">
+                            <label class="gender-option">
+                                <input type="radio" name="gender" value="male" required>
+                                <span class="gender-icon"><i class="fas fa-mars"></i></span>
+                                <span>ذكر</span>
+                            </label>
+                            <label class="gender-option">
+                                <input type="radio" name="gender" value="female" required>
+                                <span class="gender-icon"><i class="fas fa-venus"></i></span>
+                                <span>أنثى</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="submit-btn">
+                        <i class="fas fa-user-plus"></i> إنشاء حساب
+                    </button>
+                    
+                    <div class="form-footer">
+                        <p>لديك حساب بالفعل؟ <a href="#" onclick="showLogin()">سجل دخول</a></p>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- شاشة الدخول كضيف -->
+        <div id="guestScreen" class="screen">
+            <div class="form-card">
+                <button class="back-btn" onclick="showStartScreen()">
+                    <i class="fas fa-arrow-right"></i> رجوع
+                </button>
+                
+                <h2><i class="fas fa-user-clock"></i> الدخول كضيف</h2>
+                
+                <form id="guestForm">
+                    <div class="form-group">
+                        <label for="guestName"><i class="fas fa-user-tag"></i> اسمك</label>
+                        <input type="text" id="guestName" required placeholder="اختر اسمك المؤقت">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label><i class="fas fa-venus-mars"></i> الجنس</label>
+                        <div class="gender-options">
+                            <label class="gender-option">
+                                <input type="radio" name="guestGender" value="male" required>
+                                <span class="gender-icon"><i class="fas fa-mars"></i></span>
+                                <span>ذكر</span>
+                            </label>
+                            <label class="gender-option">
+                                <input type="radio" name="guestGender" value="female" required>
+                                <span class="gender-icon"><i class="fas fa-venus"></i></span>
+                                <span>أنثى</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="guest-info">
+                        <p><i class="fas fa-info-circle"></i> معلومات:</p>
+                        <ul>
+                            <li>الدخول كضيف مؤقت</li>
+                            <li>لا يمكنك الحصول على ترقيات</li>
+                            <li>لا تظهر في قائمة الأعلى تفاعلاً</li>
+                            <li>يمكنك تغيير الصورة والاسم فقط</li>
+                        </ul>
+                    </div>
+                    
+                    <button type="submit" class="submit-btn">
+                        <i class="fas fa-door-open"></i> دخول كضيف
+                    </button>
+                </form>
+            </div>
         </div>
     </div>
 
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="script.js"></script>
+    <!-- إشعارات -->
+    <div id="notificationArea"></div>
+
+    <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
+    <script src="main.js"></script>
 </body>
 </html>
