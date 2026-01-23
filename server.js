@@ -1,550 +1,708 @@
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
-const cors = require('cors');
 const path = require('path');
-const fs = require('fs');
+const cors = require('cors');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const { v4: uuidv4 } = require('uuid');
 
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
-    cors: { origin: "*", methods: ["GET", "POST"] }
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
 });
 
+// Middleware
 app.use(cors());
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static(path.join(__dirname, 'public')));
 
-// ملفات البيانات
-const USERS_FILE = 'users.json';
-const SETTINGS_FILE = 'settings.json';
-const GIFS_FILE = 'gifs.json';
-const NEWS_FILE = 'news.json';
-
-// تحميل البيانات
-let usersData = {};
-let settingsData = { darkMode: false };
-let gifsData = [];
-let newsData = [];
-
-if (fs.existsSync(USERS_FILE)) {
-    usersData = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
-}
-if (fs.existsSync(SETTINGS_FILE)) {
-    settingsData = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8'));
-}
-if (fs.existsSync(GIFS_FILE)) {
-    gifsData = JSON.parse(fs.readFileSync(GIFS_FILE, 'utf8'));
-}
-if (fs.existsSync(NEWS_FILE)) {
-    newsData = JSON.parse(fs.readFileSync(NEWS_FILE, 'utf8'));
-}
-
-// حفظ البيانات
-function saveUsersData() { fs.writeFileSync(USERS_FILE, JSON.stringify(usersData, null, 2), 'utf8'); }
-function saveSettingsData() { fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settingsData, null, 2), 'utf8'); }
-function saveGifsData() { fs.writeFileSync(GIFS_FILE, JSON.stringify(gifsData, null, 2), 'utf8'); }
-function saveNewsData() { fs.writeFileSync(NEWS_FILE, JSON.stringify(newsData, null, 2), 'utf8'); }
-
-// تهيئة المالك
-if (!usersData['محمد']) {
-    usersData['محمد'] = {
-        password: 'aumsalah079',
-        gender: 'ذكر',
-        age: 30,
-        role: 'مالك',
-        joinDate: new Date().toISOString(),
-        interaction: 1500,
-        messagesCount: 0,
-        profilePic: 'https://api.dicebear.com/7.x/avataaars/svg?seed=محمد&backgroundColor=FFD700',
-        profileColor: '#FFD700',
-        profileFrame: 'gold-frame.gif',
-        coverPhoto: '',
-        serial: 1,
-        friends: [],
-        friendRequests: [],
-        likes: 0,
-        likedBy: [],
-        profileSong: '',
-        bio: 'مالك ومؤسس الشات',
-        status: 'نشط',
-        privateChatEnabled: true,
-        title: 'المؤسس',
-        isOnline: false,
-        lastSeen: new Date().toISOString(),
-        nameGlow: true,
-        nameColor: '#FFD700'
-    };
-    saveUsersData();
-}
-
-// المستخدمون المتصلون
-const onlineUsers = new Map();
+// قاعدة بيانات مؤقتة (في الإنتاج استخدم MongoDB أو MySQL)
+const users = new Map();
+const rooms = new Map();
+const messages = new Map();
+const privateMessages = new Map();
+const blockedUsers = new Map();
 const mutedUsers = new Map();
+const diaryPosts = new Map();
+
+// تهيئة الغرف الافتراضية
+const defaultRooms = [
+  { id: 'general', name: 'العمومية', description: 'الغرفة الرئيسية للجميع', color: '#3B82F6' },
+  { id: 'games', name: 'الألعاب', description: 'مناقشة الألعاب والمسابقات', color: '#10B981' },
+  { id: 'friends', name: 'التعارف', description: 'التعارف وبناء الصداقات', color: '#8B5CF6' },
+  { id: 'tech', name: 'التقنية', description: 'مناقشة المواضيع التقنية', color: '#F59E0B' }
+];
+
+defaultRooms.forEach(room => {
+  rooms.set(room.id, {
+    ...room,
+    users: new Set(),
+    messages: []
+  });
+});
+
+// JWT Secret
+const JWT_SECRET = 'your-secret-key-change-in-production';
+
+// وظائف المساعدة
+function generateToken(user) {
+  return jwt.sign(
+    { 
+      id: user.id, 
+      username: user.username, 
+      role: user.role,
+      color: user.textColor,
+      font: user.font,
+      fontSize: user.fontSize
+    }, 
+    JWT_SECRET, 
+    { expiresIn: '7d' }
+  );
+}
+
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  
+  if (!token) {
+    return res.status(401).json({ error: 'الوصول مرفوض' });
+  }
+  
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) {
+      return res.status(403).json({ error: 'التوكن غير صالح' });
+    }
+    req.user = user;
+    next();
+  });
+}
+
+// Routes
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+app.get('/chat', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'chat.html'));
+});
 
 // API Routes
-app.get('/api/settings', (req, res) => res.json({ success: true, settings: settingsData }));
-app.post('/api/settings', (req, res) => {
-    settingsData.darkMode = req.body.darkMode;
-    saveSettingsData();
-    res.json({ success: true, message: 'تم تحديث الإعدادات' });
-});
-
-app.post('/api/check-username', (req, res) => {
-    const username = req.body.username.toLowerCase();
-    const exists = Object.keys(usersData).some(u => u.toLowerCase() === username);
-    res.json({ exists });
-});
-
-app.post('/api/register', (req, res) => {
-    const { username, password, gender, age } = req.body;
+app.post('/api/register', async (req, res) => {
+  try {
+    const { username, password } = req.body;
     
-    if (username.toLowerCase() === 'محمد') {
-        return res.json({ success: false, message: 'اسم المستخدم محجوز' });
+    if (!username || !password) {
+      return res.status(400).json({ error: 'اسم المستخدم وكلمة المرور مطلوبان' });
     }
     
-    const usernameExists = Object.keys(usersData).some(u => u.toLowerCase() === username.toLowerCase());
-    if (usernameExists) return res.json({ success: false, message: 'اسم المستخدم موجود مسبقاً' });
-    if (username.length < 3) return res.json({ success: false, message: 'اسم المستخدم يجب أن يكون 3 أحرف على الأقل' });
-    if (password.length < 4) return res.json({ success: false, message: 'كلمة السر يجب أن تكون 4 أحرف على الأقل' });
-    if (age < 13 || age > 100) return res.json({ success: false, message: 'العمر يجب أن يكون بين 13 و 100 سنة' });
+    if (users.has(username.toLowerCase())) {
+      return res.status(400).json({ error: 'اسم المستخدم محجوز' });
+    }
     
-    const serials = Object.values(usersData).map(u => u.serial);
-    const serial = Math.max(...serials, 0) + 1;
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const userId = uuidv4();
     
-    usersData[username] = {
-        password,
-        gender,
-        age: parseInt(age),
-        role: 'عضو',
-        joinDate: new Date().toISOString(),
-        interaction: 0,
-        messagesCount: 0,
-        profilePic: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(username)}&backgroundColor=${gender === 'أنثى' ? 'FF69B4' : '1E90FF'}`,
-        profileColor: gender === 'أنثى' ? '#FF69B4' : '#1E90FF',
-        profileFrame: '',
-        coverPhoto: '',
-        serial,
-        friends: [],
-        friendRequests: [],
-        likes: 0,
-        likedBy: [],
-        profileSong: '',
-        bio: 'مرحباً! أنا جديد هنا.',
-        status: 'نشط',
-        privateChatEnabled: true,
-        title: '',
-        isOnline: true,
-        lastSeen: new Date().toISOString(),
-        nameGlow: false,
-        nameColor: gender === 'أنثى' ? '#FF69B4' : '#1E90FF'
+    const newUser = {
+      id: userId,
+      username: username.trim(),
+      password: hashedPassword,
+      role: 'member',
+      avatar: 'default.png',
+      textColor: '#000000',
+      font: 'Arial',
+      fontSize: 'medium',
+      joinDate: new Date(),
+      lastSeen: new Date(),
+      isOnline: false,
+      socketId: null,
+      diaryPosts: [],
+      blockedUsers: [],
+      ignoredBy: []
     };
     
-    saveUsersData();
-    res.json({ success: true, user: { username, role: 'عضو', gender, profilePic: usersData[username].profilePic, serial } });
-});
-
-app.get('/api/user/:username', (req, res) => {
-    const user = usersData[req.params.username];
-    if (user) {
-        const { password, ...userInfo } = user;
-        res.json({ success: true, user: userInfo });
-    } else {
-        res.json({ success: false, message: 'المستخدم غير موجود' });
-    }
-});
-
-app.get('/api/all-users', (req, res) => {
-    const usersArray = Object.keys(usersData).map(username => {
-        const { password, ...userInfo } = usersData[username];
-        return { username, ...userInfo };
+    users.set(username.toLowerCase(), newUser);
+    
+    const token = generateToken(newUser);
+    
+    res.json({
+      success: true,
+      token,
+      user: {
+        id: newUser.id,
+        username: newUser.username,
+        role: newUser.role,
+        avatar: newUser.avatar,
+        textColor: newUser.textColor,
+        font: newUser.font,
+        fontSize: newUser.fontSize
+      }
     });
-    res.json({ success: true, users: usersArray });
+  } catch (error) {
+    console.error('Registration error:', error);
+    res.status(500).json({ error: 'خطأ في السيرفر' });
+  }
 });
 
-app.post('/api/update-profile', (req, res) => {
-    const { username, updates } = req.body;
-    if (usersData[username]) {
-        Object.keys(updates).forEach(key => {
-            if (!['password', 'serial', 'role'].includes(key)) {
-                usersData[username][key] = updates[key];
-            }
-        });
-        saveUsersData();
-        res.json({ success: true, message: 'تم تحديث البروفايل' });
-    } else {
-        res.json({ success: false, message: 'المستخدم غير موجود' });
-    }
-});
-
-app.post('/api/update-role', (req, res) => {
-    const { adminUsername, targetUsername, newRole } = req.body;
-    if (!usersData[adminUsername] || !usersData[targetUsername]) {
-        return res.json({ success: false, message: 'المستخدم غير موجود' });
+app.post('/api/login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    
+    const userKey = username.toLowerCase();
+    const user = users.get(userKey);
+    
+    if (!user) {
+      return res.status(401).json({ error: 'اسم المستخدم أو كلمة المرور غير صحيحة' });
     }
     
-    const adminRole = usersData[adminUsername].role;
-    if (adminRole !== 'مالك' && adminRole !== 'وزير' && adminRole !== 'وزيرة') {
-        return res.json({ success: false, message: 'ليس لديك الصلاحية' });
+    const validPassword = await bcrypt.compare(password, user.password);
+    if (!validPassword) {
+      return res.status(401).json({ error: 'اسم المستخدم أو كلمة المرور غير صحيحة' });
     }
     
-    if (adminRole === 'وزير' || adminRole === 'وزيرة') {
-        if (usersData[targetUsername].role === 'مالك') {
-            return res.json({ success: false, message: 'لا يمكنك تعديل رتبة المالك' });
-        }
-        if (!['عضو', 'عضو مميز', 'زائر'].includes(newRole)) {
-            return res.json({ success: false, message: 'لا يمكنك تعيين هذه الرتبة' });
-        }
+    user.lastSeen = new Date();
+    users.set(userKey, user);
+    
+    const token = generateToken(user);
+    
+    res.json({
+      success: true,
+      token,
+      user: {
+        id: user.id,
+        username: user.username,
+        role: user.role,
+        avatar: user.avatar,
+        textColor: user.textColor,
+        font: user.font,
+        fontSize: user.fontSize
+      }
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ error: 'خطأ في السيرفر' });
+  }
+});
+
+app.post('/api/update-profile', authenticateToken, (req, res) => {
+  try {
+    const { textColor, font, fontSize } = req.body;
+    const username = req.user.username.toLowerCase();
+    const user = users.get(username);
+    
+    if (!user) {
+      return res.status(404).json({ error: 'المستخدم غير موجود' });
     }
     
-    const oldRole = usersData[targetUsername].role;
-    usersData[targetUsername].role = newRole;
-    updateUserFeatures(targetUsername, newRole);
-    saveUsersData();
+    if (textColor) user.textColor = textColor;
+    if (font) user.font = font;
+    if (fontSize) user.fontSize = fontSize;
     
-    io.emit('role-updated', { targetUsername, oldRole, newRole, by: adminUsername });
-    res.json({ success: true, message: `تم تحديث رتبة ${targetUsername} إلى ${newRole}` });
+    users.set(username, user);
+    
+    // تحديث التوكن بالمعلومات الجديدة
+    const token = generateToken(user);
+    
+    res.json({
+      success: true,
+      token,
+      user: {
+        id: user.id,
+        username: user.username,
+        role: user.role,
+        avatar: user.avatar,
+        textColor: user.textColor,
+        font: user.font,
+        fontSize: user.fontSize
+      }
+    });
+  } catch (error) {
+    console.error('Profile update error:', error);
+    res.status(500).json({ error: 'خطأ في تحديث الملف الشخصي' });
+  }
 });
 
-app.get('/api/gifs', (req, res) => res.json({ success: true, gifs: gifsData }));
-app.post('/api/gifs', (req, res) => {
-    const { username, url, name } = req.body;
-    if (usersData[username]?.role !== 'مالك') {
-        return res.json({ success: false, message: 'فقط المالك يمكنه إضافة GIFs' });
-    }
-    const newGif = { id: Date.now(), url, name: name || `GIF ${gifsData.length + 1}`, addedBy: username, addedAt: new Date().toISOString() };
-    gifsData.push(newGif);
-    saveGifsData();
-    io.emit('gif-added', newGif);
-    res.json({ success: true, message: 'تمت إضافة GIF' });
-});
-app.delete('/api/gifs/:id', (req, res) => {
-    const { id } = req.params;
-    const { username } = req.body;
-    if (usersData[username]?.role !== 'مالك') {
-        return res.json({ success: false, message: 'فقط المالك يمكنه حذف GIFs' });
-    }
-    const index = gifsData.findIndex(gif => gif.id == id);
-    if (index !== -1) {
-        gifsData.splice(index, 1);
-        saveGifsData();
-        io.emit('gif-removed', id);
-        res.json({ success: true, message: 'تم حذف GIF' });
-    } else {
-        res.json({ success: false, message: 'GIF غير موجود' });
-    }
+app.get('/api/rooms', (req, res) => {
+  const roomsArray = Array.from(rooms.values()).map(room => ({
+    id: room.id,
+    name: room.name,
+    description: room.description,
+    color: room.color,
+    userCount: room.users.size
+  }));
+  
+  res.json({ rooms: roomsArray });
 });
 
-app.get('/api/news', (req, res) => res.json({ success: true, news: newsData.slice(0, 20) }));
-app.post('/api/news', (req, res) => {
-    const { username, content, image } = req.body;
-    const userRole = usersData[username]?.role;
-    if (!['مالك', 'وزير', 'وزيرة'].includes(userRole)) {
-        return res.json({ success: false, message: 'ليس لديك الصلاحية للنشر' });
-    }
-    const news = { id: Date.now(), username, content, image, timestamp: new Date().toISOString(), likes: 0, comments: [] };
-    newsData.unshift(news);
-    if (newsData.length > 50) newsData.pop();
-    saveNewsData();
-    io.emit('new-news', news);
-    res.json({ success: true, message: 'تم نشر الخبر' });
-});
-app.delete('/api/news/:id', (req, res) => {
-    const { id } = req.params;
-    const { username } = req.body;
-    if (usersData[username]?.role !== 'مالك') {
-        return res.json({ success: false, message: 'فقط المالك يمكنه حذف الأخبار' });
-    }
-    const index = newsData.findIndex(n => n.id == id);
-    if (index !== -1) {
-        newsData.splice(index, 1);
-        saveNewsData();
-        io.emit('news-deleted', id);
-        res.json({ success: true, message: 'تم حذف الخبر' });
-    } else {
-        res.json({ success: false, message: 'الخبر غير موجود' });
-    }
+app.get('/api/room/:roomId/messages', authenticateToken, (req, res) => {
+  const { roomId } = req.params;
+  const room = rooms.get(roomId);
+  
+  if (!room) {
+    return res.status(404).json({ error: 'الغرفة غير موجودة' });
+  }
+  
+  res.json({ messages: room.messages.slice(-100) }); // إرسال آخر 100 رسالة فقط
 });
 
-app.use(express.static(path.join(__dirname, 'public')));
-app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
-
-// Socket.io Events
+// Socket.IO Handling
 io.on('connection', (socket) => {
-    console.log('✅ مستخدم جديد متصل:', socket.id);
-
-    socket.on('user-join', (userData) => {
-        const { username } = userData;
-        onlineUsers.set(username, { socketId: socket.id, ...userData, joinTime: new Date().toISOString() });
+  console.log('مستخدم جديد متصل:', socket.id);
+  
+  socket.on('join', async ({ token, roomId }) => {
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET);
+      const userKey = decoded.username.toLowerCase();
+      const user = users.get(userKey);
+      
+      if (!user) {
+        socket.emit('error', { message: 'المستخدم غير موجود' });
+        return;
+      }
+      
+      // تحديث حالة المستخدم
+      user.isOnline = true;
+      user.socketId = socket.id;
+      user.lastSeen = new Date();
+      users.set(userKey, user);
+      
+      // تخزين بيانات المستخدم في Socket
+      socket.userId = user.id;
+      socket.username = user.username;
+      socket.role = user.role;
+      socket.textColor = user.textColor;
+      socket.font = user.font;
+      socket.fontSize = user.fontSize;
+      
+      // الانضمام للغرفة
+      socket.join(roomId);
+      socket.currentRoom = roomId;
+      
+      const room = rooms.get(roomId);
+      if (room) {
+        room.users.add(user.username);
         
-        if (usersData[username]) {
-            usersData[username].isOnline = true;
-            usersData[username].lastSeen = new Date().toISOString();
-            saveUsersData();
-        }
-        
-        // تأثير الدخول حسب الرتبة
-        const effects = {
-            'مالك': { type: 'special', message: `✨ ${username} الملك دخل الشات! ✨`, sound: 'royal-join.mp3', animation: 'crown-glow' },
-            'وزير': { type: 'minister', message: `⭐ ${username} الوزير دخل الشات`, sound: 'minister-join.mp3', animation: 'star-pulse' },
-            'وزيرة': { type: 'minister', message: `⭐ ${username} الوزيرة دخلت الشات`, sound: 'minister-join.mp3', animation: 'star-pulse' },
-            'عضو مميز': { type: 'vip', message: `🌟 ${username} العضو المميز دخل الشات`, sound: 'vip-join.mp3', animation: 'vip-glow' }
+        // إرسال رسالة دخول للغرفة
+        const joinMessage = {
+          id: uuidv4(),
+          type: 'system',
+          content: `${user.username} انضم للغرفة`,
+          timestamp: new Date(),
+          roomId: roomId
         };
         
-        const effect = effects[userData.role];
-        if (effect) {
-            io.emit('user-join-effect', { username, ...effect });
-        } else {
-            io.emit('user-joined', { username, role: userData.role, profilePic: userData.profilePic });
-        }
+        room.messages.push(joinMessage);
         
-        io.emit('online-users-updated', Array.from(onlineUsers.values()));
-    });
-
-    socket.on('send-message', (messageData) => {
-        const { username, text, room = 'general', replyTo = null } = messageData;
-        if (!username || !text || mutedUsers.has(username)) return;
-        
-        const message = {
-            id: Date.now(),
-            username,
-            text,
-            room,
-            replyTo,
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            timestampFull: new Date().toISOString(),
-            userInfo: usersData[username] || { role: 'زائر', gender: 'ذكر' }
-        };
-        
-        if (usersData[username] && !usersData[username].isGuest) {
-            usersData[username].interaction += 1;
-            usersData[username].messagesCount += 1;
-            saveUsersData();
-        }
-        
-        io.emit('new-message', message);
-        
-        const mentionRegex = /@([\u0600-\u06FF\w]+)/g;
-        const mentions = [...text.matchAll(mentionRegex)].map(m => m[1]);
-        mentions.forEach(mentionedUser => {
-            if (onlineUsers.has(mentionedUser)) {
-                io.to(onlineUsers.get(mentionedUser).socketId).emit('mentioned', {
-                    by: username,
-                    message: text,
-                    messageId: message.id
-                });
-            }
+        // إرسال قائمة المستخدمين المحدثة للجميع
+        const roomUsers = Array.from(room.users);
+        io.to(roomId).emit('userListUpdate', { 
+          roomId, 
+          users: roomUsers.map(u => {
+            const userObj = users.get(u.toLowerCase());
+            return {
+              username: u,
+              role: userObj?.role || 'visitor',
+              isOnline: userObj?.isOnline || false,
+              textColor: userObj?.textColor || '#666666',
+              avatar: userObj?.avatar || 'default.png'
+            };
+          })
         });
-    });
-
-    socket.on('like-profile', (data) => {
-        const { targetUsername, likerUsername } = data;
-        if (usersData[targetUsername] && usersData[likerUsername]) {
-            if (!usersData[targetUsername].likedBy.includes(likerUsername)) {
-                usersData[targetUsername].likes += 1;
-                usersData[targetUsername].likedBy.push(likerUsername);
-                saveUsersData();
-                
-                if (onlineUsers.has(targetUsername)) {
-                    io.to(onlineUsers.get(targetUsername).socketId).emit('profile-liked', {
-                        by: likerUsername,
-                        likes: usersData[targetUsername].likes
-                    });
-                }
-            }
-        }
-    });
-
-    socket.on('manage-user', (data) => {
-        const { adminUsername, targetUsername, action, duration = 300, reason = '' } = data;
-        if (!usersData[adminUsername] || !usersData[targetUsername]) {
-            socket.emit('manage-user-error', 'المستخدم غير موجود');
-            return;
-        }
         
-        const adminRole = usersData[adminUsername].role;
-        const targetRole = usersData[targetUsername].role;
+        // إرسال الرسالة الجديدة
+        io.to(roomId).emit('newMessage', joinMessage);
         
-        if (adminRole !== 'مالك' && (adminRole !== 'وزير' && adminRole !== 'وزيرة')) {
-            socket.emit('manage-user-error', 'ليس لديك الصلاحية');
-            return;
-        }
-        
-        if ((adminRole === 'وزير' || adminRole === 'وزيرة') && targetRole === 'مالك') {
-            socket.emit('manage-user-error', 'لا يمكنك إدارة المالك');
-            return;
-        }
-        
-        if (action === 'kick') {
-            const targetSocket = onlineUsers.get(targetUsername)?.socketId;
-            if (targetSocket) {
-                io.to(targetSocket).emit('kicked', { by: adminUsername, reason });
-                setTimeout(() => {
-                    if (onlineUsers.has(targetUsername)) {
-                        const socketToDisconnect = io.sockets.sockets.get(targetSocket);
-                        if (socketToDisconnect) socketToDisconnect.disconnect();
-                    }
-                }, 3000);
-            }
-            io.emit('user-kicked', { targetUsername, by: adminUsername, reason });
-            
-        } else if (action === 'mute') {
-            const unmuteTime = Date.now() + (duration * 1000);
-            mutedUsers.set(targetUsername, unmuteTime);
-            
-            if (!usersData[targetUsername].mutes) usersData[targetUsername].mutes = [];
-            usersData[targetUsername].mutes.push({
-                by: adminUsername,
-                duration,
-                unmuteTime,
-                reason,
-                time: new Date().toISOString()
-            });
-            saveUsersData();
-            
-            const targetSocket = onlineUsers.get(targetUsername)?.socketId;
-            if (targetSocket) {
-                io.to(targetSocket).emit('muted', { by: adminUsername, duration, reason });
-            }
-            io.emit('user-muted', { targetUsername, by: adminUsername, duration, reason });
-            
-            setTimeout(() => {
-                if (mutedUsers.get(targetUsername) === unmuteTime) {
-                    mutedUsers.delete(targetUsername);
-                    if (usersData[targetUsername]?.mutes) {
-                        usersData[targetUsername].mutes = usersData[targetUsername].mutes.filter(
-                            m => m.unmuteTime !== unmuteTime
-                        );
-                        saveUsersData();
-                    }
-                    const currentSocket = onlineUsers.get(targetUsername)?.socketId;
-                    if (currentSocket) {
-                        io.to(currentSocket).emit('unmuted');
-                    }
-                }
-            }, duration * 1000);
-            
-        } else if (action === 'unmute') {
-            mutedUsers.delete(targetUsername);
-            if (usersData[targetUsername]?.mutes) {
-                usersData[targetUsername].mutes = [];
-                saveUsersData();
-            }
-            const targetSocket = onlineUsers.get(targetUsername)?.socketId;
-            if (targetSocket) {
-                io.to(targetSocket).emit('unmuted');
-            }
-            io.emit('user-unmuted', { targetUsername, by: adminUsername });
-        }
-    });
-
-    socket.on('delete-message', (data) => {
-        const { messageId, deleterUsername } = data;
-        if (!usersData[deleterUsername]) return;
-        
-        const deleterRole = usersData[deleterUsername].role;
-        const canDelete = deleterRole === 'مالك' || 
-                         (deleterRole === 'وزير' || deleterRole === 'وزيرة') ||
-                         deleterRole === 'عضو مميز' || 
-                         deleterRole === 'عضو';
-        
-        if (canDelete) {
-            io.emit('message-deleted', { messageId, deletedBy: deleterUsername });
+        // إرسال بيانات الغرفة للمستخدم
+        socket.emit('roomJoined', {
+          room: {
+            id: room.id,
+            name: room.name,
+            description: room.description,
+            color: room.color
+          },
+          users: roomUsers.map(u => {
+            const userObj = users.get(u.toLowerCase());
+            return {
+              username: u,
+              role: userObj?.role || 'visitor',
+              isOnline: userObj?.isOnline || false,
+              textColor: userObj?.textColor || '#666666',
+              avatar: userObj?.avatar || 'default.png'
+            };
+          }),
+          messages: room.messages.slice(-50)
+        });
+      }
+      
+      // إرسال تحديث حالة الاتصال لجميع المستخدمين
+      io.emit('userStatusChange', {
+        username: user.username,
+        isOnline: true,
+        role: user.role
+      });
+      
+    } catch (error) {
+      console.error('Join error:', error);
+      socket.emit('error', { message: 'خطأ في المصادقة' });
+    }
+  });
+  
+  socket.on('sendMessage', ({ token, roomId, content, type = 'text' }) => {
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET);
+      const userKey = decoded.username.toLowerCase();
+      const user = users.get(userKey);
+      
+      if (!user) {
+        socket.emit('error', { message: 'المستخدم غير موجود' });
+        return;
+      }
+      
+      // التحقق من حالة الكتم
+      const muteKey = `${user.username}:${roomId}`;
+      if (mutedUsers.has(muteKey)) {
+        const muteInfo = mutedUsers.get(muteKey);
+        if (muteInfo.expires > new Date()) {
+          socket.emit('muted', { 
+            message: `أنت مكتم حتى ${muteInfo.expires.toLocaleTimeString('ar-EG')}`,
+            expires: muteInfo.expires
+          });
+          return;
         } else {
-            socket.emit('delete-error', 'ليس لديك الصلاحية لحذف هذه الرسالة');
+          mutedUsers.delete(muteKey);
         }
-    });
-
-    socket.on('get-news', () => {
-        socket.emit('news-wall', newsData.slice(0, 20));
-    });
-
-    socket.on('like-news', (data) => {
-        const { newsId, username } = data;
-        const news = newsData.find(n => n.id === newsId);
-        if (news) {
-            if (!news.likedBy) news.likedBy = [];
-            if (!news.likedBy.includes(username)) {
-                news.likes += 1;
-                news.likedBy.push(username);
-                io.emit('news-liked', { newsId, likes: news.likes });
-            }
-        }
-    });
-
-    socket.on('comment-news', (data) => {
-        const { newsId, username, comment } = data;
-        const news = newsData.find(n => n.id === newsId);
-        if (news) {
-            if (!news.comments) news.comments = [];
-            news.comments.push({ username, comment, timestamp: new Date().toISOString() });
-            io.emit('news-commented', { newsId, comment: news.comments[news.comments.length - 1] });
-        }
-    });
-
-    socket.on('disconnect', () => {
-        let disconnectedUser = null;
-        for (const [username, data] of onlineUsers.entries()) {
-            if (data.socketId === socket.id) {
-                disconnectedUser = { username, ...data };
-                break;
-            }
-        }
+      }
+      
+      const room = rooms.get(roomId);
+      if (!room) {
+        socket.emit('error', { message: 'الغرفة غير موجودة' });
+        return;
+      }
+      
+      const messageId = uuidv4();
+      const newMessage = {
+        id: messageId,
+        type,
+        content,
+        sender: user.username,
+        senderRole: user.role,
+        senderColor: user.textColor,
+        senderFont: user.font,
+        senderFontSize: user.fontSize,
+        timestamp: new Date(),
+        roomId
+      };
+      
+      // حفظ الرسالة
+      room.messages.push(newMessage);
+      
+      // إرسال الرسالة لجميع المستخدمين في الغرفة
+      io.to(roomId).emit('newMessage', newMessage);
+      
+    } catch (error) {
+      console.error('Send message error:', error);
+      socket.emit('error', { message: 'خطأ في إرسال الرسالة' });
+    }
+  });
+  
+  socket.on('sendPrivateMessage', ({ token, recipient, content, type = 'text' }) => {
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET);
+      const senderKey = decoded.username.toLowerCase();
+      const sender = users.get(senderKey);
+      
+      if (!sender) {
+        socket.emit('error', { message: 'المستخدم غير موجود' });
+        return;
+      }
+      
+      const recipientKey = recipient.toLowerCase();
+      const recipientUser = users.get(recipientKey);
+      
+      if (!recipientUser) {
+        socket.emit('error', { message: 'المستقبل غير موجود' });
+        return;
+      }
+      
+      // التحقق من التجاهل
+      if (recipientUser.blockedUsers?.includes(sender.username)) {
+        socket.emit('error', { message: 'لا يمكن إرسال رسالة لهذا المستخدم' });
+        return;
+      }
+      
+      const messageId = uuidv4();
+      const privateMessage = {
+        id: messageId,
+        type,
+        content,
+        sender: sender.username,
+        senderRole: sender.role,
+        senderColor: sender.textColor,
+        senderFont: sender.font,
+        senderFontSize: sender.fontSize,
+        recipient: recipient,
+        timestamp: new Date(),
+        read: false
+      };
+      
+      // حفظ الرسالة الخاصة
+      const chatKey = [sender.username, recipient].sort().join(':');
+      if (!privateMessages.has(chatKey)) {
+        privateMessages.set(chatKey, []);
+      }
+      privateMessages.get(chatKey).push(privateMessage);
+      
+      // إرسال الرسالة للمستقبل إذا كان متصلًا
+      if (recipientUser.socketId) {
+        io.to(recipientUser.socketId).emit('newPrivateMessage', privateMessage);
+        io.to(recipientUser.socketId).emit('notification', {
+          type: 'privateMessage',
+          from: sender.username,
+          message: 'رسالة خاصة جديدة'
+        });
+      }
+      
+      // تأكيد الإرسال للمرسل
+      socket.emit('privateMessageSent', privateMessage);
+      
+    } catch (error) {
+      console.error('Private message error:', error);
+      socket.emit('error', { message: 'خطأ في إرسال الرسالة الخاصة' });
+    }
+  });
+  
+  socket.on('muteUser', ({ token, roomId, targetUsername, durationMinutes = 10 }) => {
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET);
+      const moderatorKey = decoded.username.toLowerCase();
+      const moderator = users.get(moderatorKey);
+      
+      if (!moderator || (moderator.role !== 'admin' && moderator.role !== 'owner')) {
+        socket.emit('error', { message: 'ليس لديك صلاحية لهذا الإجراء' });
+        return;
+      }
+      
+      const targetKey = targetUsername.toLowerCase();
+      const targetUser = users.get(targetKey);
+      
+      if (!targetUser) {
+        socket.emit('error', { message: 'المستخدم غير موجود' });
+        return;
+      }
+      
+      const muteKey = `${targetUsername}:${roomId}`;
+      const expires = new Date();
+      expires.setMinutes(expires.getMinutes() + durationMinutes);
+      
+      mutedUsers.set(muteKey, {
+        username: targetUsername,
+        roomId,
+        moderator: moderator.username,
+        expires,
+        durationMinutes
+      });
+      
+      // إرسال رسالة نظامية
+      const room = rooms.get(roomId);
+      if (room) {
+        const systemMessage = {
+          id: uuidv4(),
+          type: 'system',
+          content: `قام المشرف ${moderator.username} بكتم العضو ${targetUsername} لمدة ${durationMinutes} دقائق`,
+          timestamp: new Date(),
+          roomId
+        };
         
-        if (disconnectedUser) {
-            if (usersData[disconnectedUser.username]) {
-                usersData[disconnectedUser.username].isOnline = false;
-                usersData[disconnectedUser.username].lastSeen = new Date().toISOString();
-                saveUsersData();
-            }
+        room.messages.push(systemMessage);
+        io.to(roomId).emit('newMessage', systemMessage);
+      }
+      
+      // إعلام المستخدم المكتم
+      if (targetUser.socketId) {
+        io.to(targetUser.socketId).emit('muted', {
+          message: `لقد تم كتمك لمدة ${durationMinutes} دقائق`,
+          expires,
+          roomId
+        });
+      }
+      
+    } catch (error) {
+      console.error('Mute user error:', error);
+      socket.emit('error', { message: 'خطأ في كتم المستخدم' });
+    }
+  });
+  
+  socket.on('kickUser', ({ token, roomId, targetUsername }) => {
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET);
+      const moderatorKey = decoded.username.toLowerCase();
+      const moderator = users.get(moderatorKey);
+      
+      if (!moderator || (moderator.role !== 'admin' && moderator.role !== 'owner')) {
+        socket.emit('error', { message: 'ليس لديك صلاحية لهذا الإجراء' });
+        return;
+      }
+      
+      const targetKey = targetUsername.toLowerCase();
+      const targetUser = users.get(targetKey);
+      
+      if (!targetUser) {
+        socket.emit('error', { message: 'المستخدم غير موجود' });
+        return;
+      }
+      
+      // طرد المستخدم من الغرفة
+      const room = rooms.get(roomId);
+      if (room) {
+        room.users.delete(targetUsername);
+        
+        // إرسال رسالة نظامية
+        const systemMessage = {
+          id: uuidv4(),
+          type: 'system',
+          content: `قام المشرف ${moderator.username} بطرد العضو ${targetUsername} من الغرفة`,
+          timestamp: new Date(),
+          roomId
+        };
+        
+        room.messages.push(systemMessage);
+        io.to(roomId).emit('newMessage', systemMessage);
+        
+        // تحديث قائمة المستخدمين
+        const roomUsers = Array.from(room.users);
+        io.to(roomId).emit('userListUpdate', {
+          roomId,
+          users: roomUsers.map(u => {
+            const userObj = users.get(u.toLowerCase());
+            return {
+              username: u,
+              role: userObj?.role || 'visitor',
+              isOnline: userObj?.isOnline || false,
+              textColor: userObj?.textColor || '#666666'
+            };
+          })
+        });
+      }
+      
+      // إعلام المستخدم المطرود
+      if (targetUser.socketId) {
+        io.to(targetUser.socketId).emit('kicked', {
+          roomId,
+          message: `لقد تم طردك من الغرفة بواسطة ${moderator.username}`
+        });
+      }
+      
+    } catch (error) {
+      console.error('Kick user error:', error);
+      socket.emit('error', { message: 'خطأ في طرد المستخدم' });
+    }
+  });
+  
+  socket.on('blockUser', ({ token, targetUsername }) => {
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET);
+      const userKey = decoded.username.toLowerCase();
+      const user = users.get(userKey);
+      
+      if (!user) {
+        socket.emit('error', { message: 'المستخدم غير موجود' });
+        return;
+      }
+      
+      const targetKey = targetUsername.toLowerCase();
+      const targetUser = users.get(targetKey);
+      
+      if (!targetUser) {
+        socket.emit('error', { message: 'المستخدم غير موجود' });
+        return;
+      }
+      
+      if (!user.blockedUsers) {
+        user.blockedUsers = [];
+      }
+      
+      if (!user.blockedUsers.includes(targetUsername)) {
+        user.blockedUsers.push(targetUsername);
+        users.set(userKey, user);
+      }
+      
+      socket.emit('userBlocked', {
+        username: targetUsername,
+        message: `تم تجاهل ${targetUsername}. لن ترى رسائله بعد الآن.`
+      });
+      
+    } catch (error) {
+      console.error('Block user error:', error);
+      socket.emit('error', { message: 'خطأ في تجاهل المستخدم' });
+    }
+  });
+  
+  socket.on('disconnect', () => {
+    console.log('مستخدم انقطع:', socket.username || socket.id);
+    
+    if (socket.username) {
+      const userKey = socket.username.toLowerCase();
+      const user = users.get(userKey);
+      
+      if (user) {
+        user.isOnline = false;
+        user.socketId = null;
+        user.lastSeen = new Date();
+        users.set(userKey, user);
+        
+        // تحديث حالة الاتصال لجميع المستخدمين
+        io.emit('userStatusChange', {
+          username: user.username,
+          isOnline: false,
+          role: user.role
+        });
+        
+        // تحديث الغرف
+        rooms.forEach((room, roomId) => {
+          if (room.users.has(user.username)) {
+            room.users.delete(user.username);
             
-            onlineUsers.delete(disconnectedUser.username);
-            mutedUsers.delete(disconnectedUser.username);
-            
-            const exitEffects = {
-                'مالك': { type: 'special', message: `👑 ${disconnectedUser.username} الملك غادر الشات`, sound: 'royal-exit.mp3' },
-                'وزير': { type: 'minister', message: `⭐ ${disconnectedUser.username} الوزير غادر الشات`, sound: 'minister-exit.mp3' },
-                'وزيرة': { type: 'minister', message: `⭐ ${disconnectedUser.username} الوزيرة غادرت الشات`, sound: 'minister-exit.mp3' }
+            // إرسال رسالة خروج
+            const leaveMessage = {
+              id: uuidv4(),
+              type: 'system',
+              content: `${user.username} غادر الغرفة`,
+              timestamp: new Date(),
+              roomId
             };
             
-            const effect = exitEffects[disconnectedUser.role];
-            if (effect) {
-                io.emit('user-exit-effect', { username: disconnectedUser.username, ...effect });
-            } else {
-                io.emit('user-left', { username: disconnectedUser.username, role: disconnectedUser.role });
-            }
+            room.messages.push(leaveMessage);
+            io.to(roomId).emit('newMessage', leaveMessage);
             
-            io.emit('online-users-updated', Array.from(onlineUsers.values()));
-            console.log(`❌ ${disconnectedUser.username} انقطع`);
-        }
-    });
+            // تحديث قائمة المستخدمين
+            const roomUsers = Array.from(room.users);
+            io.to(roomId).emit('userListUpdate', {
+              roomId,
+              users: roomUsers.map(u => {
+                const userObj = users.get(u.toLowerCase());
+                return {
+                  username: u,
+                  role: userObj?.role || 'visitor',
+                  isOnline: userObj?.isOnline || false,
+                  textColor: userObj?.textColor || '#666666'
+                };
+              })
+            });
+          }
+        });
+      }
+    }
+  });
 });
 
-function updateUserFeatures(username, newRole) {
-    const user = usersData[username];
-    if (!user) return;
-    
-    const features = {
-        'مالك': { color: '#FFD700', frame: 'gold-frame.gif', glow: true, title: 'المالك' },
-        'وزير': { color: '#9d4edd', frame: 'purple-frame.gif', glow: true, title: 'الوزير' },
-        'وزيرة': { color: '#9d4edd', frame: 'purple-frame.gif', glow: true, title: 'الوزيرة' },
-        'عضو مميز': { color: '#4cc9f0', frame: 'blue-frame.gif', glow: true, title: 'مميز' },
-        'عضو': { color: user.gender === 'أنثى' ? '#FF69B4' : '#1E90FF', frame: '', glow: false, title: '' },
-        'زائر': { color: '#6c757d', frame: '', glow: false, title: 'زائر' }
-    };
-    
-    const feature = features[newRole];
-    if (feature) {
-        user.profileColor = feature.color;
-        user.profileFrame = feature.frame;
-        user.nameGlow = feature.glow;
-        user.nameColor = feature.color;
-        user.title = feature.title;
-    }
-}
-
+// تشغيل السيرفر
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-    console.log(`✅ الخادم يعمل على المنفذ ${PORT}`);
-    console.log(`🌐 http://localhost:${PORT}`);
+  console.log(`✅ السيرفر يعمل على المنفذ ${PORT}`);
+  console.log(`🌐 افتح http://localhost:${PORT} في المتصفح`);
 });
