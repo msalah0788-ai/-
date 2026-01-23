@@ -1,1118 +1,598 @@
-// ====== تهيئة التطبيق ======
+// تهيئة التطبيق
 document.addEventListener('DOMContentLoaded', function() {
-  // تهيئة العناصر
-  initializeElements();
-  
-  // تهيئة المستخدمين المحفوظين
-  initializeStoredUsers();
-  
-  // بدء التأثيرات
-  startBackgroundEffects();
-  
-  // التحقق من الجلسة النشطة
-  checkActiveSession();
+    // تحديد عناصر DOM
+    const modeToggle = document.getElementById('modeToggle');
+    const body = document.body;
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    const loginBtn = document.getElementById('loginBtn');
+    const registerBtn = document.getElementById('registerBtn');
+    const guestBtn = document.getElementById('guestBtn');
+    
+    // التحقق من الجلسة المخزنة
+    checkStoredSession();
+    
+    // تبديل الوضع الفاتح/الداكن
+    modeToggle.addEventListener('click', toggleTheme);
+    
+    // تعيين الوضع الحالي
+    const savedTheme = localStorage.getItem('chat-theme') || 'light';
+    if (savedTheme === 'dark') {
+        body.classList.remove('light-mode');
+        body.classList.add('dark-mode');
+        modeToggle.classList.remove('fa-moon');
+        modeToggle.classList.add('fa-sun');
+    }
+    
+    // إضافة تأثيرات للحقول
+    addInputEffects();
+    
+    // تسجيل الدخول
+    loginBtn.addEventListener('click', handleLogin);
+    
+    // تسجيل حساب جديد
+    registerBtn.addEventListener('click', handleRegister);
+    
+    // دخول زائر
+    guestBtn.addEventListener('click', handleGuestLogin);
+    
+    // السماح بالدخول باستخدام Enter
+    document.querySelectorAll('input').forEach(input => {
+        input.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                if (this.closest('#loginSection')) {
+                    handleLogin();
+                } else if (this.closest('#registerSection')) {
+                    handleRegister();
+                } else if (this.closest('#guestSection')) {
+                    handleGuestLogin();
+                }
+            }
+        });
+    });
 });
 
-// ====== المتغيرات العالمية ======
-let currentForm = 'member';
-let formData = {
-  member: {},
-  register: {},
-  guest: {}
-};
-
-let checkingUsername = false;
-
-// ====== العناصر ======
-const elements = {
-  // خيارات الدخول
-  memberLoginOption: document.getElementById('memberLoginOption'),
-  registerOption: document.getElementById('registerOption'),
-  guestOption: document.getElementById('guestOption'),
-  
-  // النماذج
-  memberForm: document.getElementById('memberForm'),
-  registerForm: document.getElementById('registerForm'),
-  guestForm: document.getElementById('guestForm'),
-  
-  // أزرار التنقل
-  backToOptionsBtn: document.getElementById('backToOptionsBtn'),
-  
-  // حقول النماذج
-  memberUsername: document.getElementById('memberUsername'),
-  memberPassword: document.getElementById('memberPassword'),
-  
-  registerUsername: document.getElementById('registerUsername'),
-  registerPassword: document.getElementById('registerPassword'),
-  registerConfirmPassword: document.getElementById('registerConfirmPassword'),
-  registerGender: document.querySelectorAll('input[name="registerGender"]'),
-  registerAge: document.getElementById('registerAge'),
-  
-  guestUsername: document.getElementById('guestUsername'),
-  guestGender: document.querySelectorAll('input[name="guestGender"]'),
-  guestAge: document.getElementById('guestAge'),
-  
-  // أزرار التحقق
-  checkRegisterUsernameBtn: document.getElementById('checkRegisterUsernameBtn'),
-  checkGuestUsernameBtn: document.getElementById('checkGuestUsernameBtn'),
-  
-  // رسائل التحقق
-  registerUsernameValidation: document.getElementById('registerUsernameValidation'),
-  guestUsernameValidation: document.getElementById('guestUsernameValidation'),
-  registerPasswordValidation: document.getElementById('registerPasswordValidation'),
-  registerAgeValidation: document.getElementById('registerAgeValidation'),
-  guestAgeValidation: document.getElementById('guestAgeValidation'),
-  
-  // أزرار الدخول
-  memberLoginBtn: document.getElementById('memberLoginBtn'),
-  registerBtn: document.getElementById('registerBtn'),
-  guestLoginBtn: document.getElementById('guestLoginBtn'),
-  
-  // أرقام تسلسلية
-  registerSerial: document.getElementById('registerSerial'),
-  guestSerial: document.getElementById('guestSerial'),
-  
-  // تأثيرات
-  particleEffect: document.getElementById('particleEffect'),
-  
-  // التنبيهات
-  notificationsContainer: document.getElementById('notificationsContainer')
-};
-
-// ====== تهيئة العناصر ======
-function initializeElements() {
-  // أحداث خيارات الدخول
-  elements.memberLoginOption.addEventListener('click', () => switchForm('member'));
-  elements.registerOption.addEventListener('click', () => switchForm('register'));
-  elements.guestOption.addEventListener('click', () => switchForm('guest'));
-  
-  // زر العودة
-  elements.backToOptionsBtn.addEventListener('click', showOptions);
-  
-  // أحداث التحقق من الحقول
-  setupValidationEvents();
-  
-  // أحداث أزرار التحقق
-  elements.checkRegisterUsernameBtn.addEventListener('click', () => checkUsername('register'));
-  elements.checkGuestUsernameBtn.addEventListener('click', () => checkUsername('guest'));
-  
-  // أحداث أزرار الدخول
-  elements.memberLoginBtn.addEventListener('click', handleMemberLogin);
-  elements.registerBtn.addEventListener('click', handleRegister);
-  elements.guestLoginBtn.addEventListener('click', handleGuestLogin);
-  
-  // أحداث Enter
-  setupEnterEvents();
-  
-  // إنشاء أرقام تسلسلية
-  generateSerials();
-}
-
-// ====== تهيئة المستخدمين المحفوظين ======
-function initializeStoredUsers() {
-  // عرض آخر 3 حسابات مسجلة
-  const storedUsers = JSON.parse(localStorage.getItem('recentUsers') || '[]');
-  
-  if (storedUsers.length > 0) {
-    const recentUsersList = document.getElementById('recentUsersList');
-    if (recentUsersList) {
-      recentUsersList.innerHTML = storedUsers
-        .slice(-3)
-        .map(user => `
-          <div class="recent-user" onclick="fillMemberForm('${user.username}')">
-            <div class="user-avatar">
-              <i class="fas fa-user"></i>
-            </div>
-            <div class="user-info">
-              <div class="username">${user.username}</div>
-              <div class="role">${user.role}</div>
-            </div>
-          </div>
-        `)
-        .join('');
+// التحقق من الجلسة المخزنة
+function checkStoredSession() {
+    const savedSession = localStorage.getItem('chat-session');
+    if (savedSession) {
+        try {
+            const sessionData = JSON.parse(savedSession);
+            if (sessionData.remember && sessionData.expiry > Date.now()) {
+                // تلقائي الدخول إذا الجلسة سارية
+                autoLogin(sessionData);
+            }
+        } catch (e) {
+            console.error('خطأ في قراءة الجلسة:', e);
+            localStorage.removeItem('chat-session');
+        }
     }
-  }
 }
 
-// ====== تبديل النماذج ======
-function switchForm(formType) {
-  currentForm = formType;
-  
-  // تحديث خيارات الدخول
-  document.querySelectorAll('.option-card').forEach(card => {
-    card.classList.remove('active');
-  });
-  
-  const activeOption = {
-    'member': elements.memberLoginOption,
-    'register': elements.registerOption,
-    'guest': elements.guestOption
-  }[formType];
-  
-  if (activeOption) {
-    activeOption.classList.add('active');
-  }
-  
-  // إخفاء جميع النماذج
-  elements.memberForm.classList.remove('active');
-  elements.registerForm.classList.remove('active');
-  elements.guestForm.classList.remove('active');
-  
-  // إظهار النموذج المحدد
-  const activeForm = {
-    'member': elements.memberForm,
-    'register': elements.registerForm,
-    'guest': elements.guestForm
-  }[formType];
-  
-  if (activeForm) {
-    activeForm.classList.add('active');
-  }
-  
-  // إظهار زر العودة
-  elements.backToOptionsBtn.classList.remove('hidden');
-  
-  // إضافة تأثير
-  addFormSwitchEffect();
+// تسجيل الدخول التلقائي
+function autoLogin(sessionData) {
+    showLoading();
+    
+    fetch('/api/login', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            username: sessionData.username,
+            password: sessionData.password,
+            remember: true
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideLoading();
+        if (data.success) {
+            // حفظ الجلسة الجديدة
+            const sessionToSave = {
+                username: sessionData.username,
+                password: sessionData.password,
+                remember: true,
+                expiry: Date.now() + (30 * 24 * 60 * 60 * 1000) // 30 يوم
+            };
+            localStorage.setItem('chat-session', JSON.stringify(sessionToSave));
+            
+            // الانتقال للدردشة
+            window.location.href = '/chat.html';
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        console.error('خطأ في الدخول التلقائي:', error);
+    });
 }
 
-// ====== إظهار خيارات الدخول ======
-function showOptions() {
-  // إخفاء جميع النماذج
-  elements.memberForm.classList.remove('active');
-  elements.registerForm.classList.remove('active');
-  elements.guestForm.classList.remove('active');
-  
-  // إخفاء زر العودة
-  elements.backToOptionsBtn.classList.add('hidden');
-  
-  // إزالة النشاط من الخيارات
-  document.querySelectorAll('.option-card').forEach(card => {
-    card.classList.remove('active');
-  });
-  
-  // إضافة تأثير
-  addParticles();
-}
-
-// ====== إعداد أحداث التحقق ======
-function setupValidationEvents() {
-  // التحقق من اسم المستخدم أثناء الكتابة
-  elements.registerUsername.addEventListener('input', () => {
-    validateUsername(elements.registerUsername, elements.registerUsernameValidation, 'register');
-  });
-  
-  elements.guestUsername.addEventListener('input', () => {
-    validateUsername(elements.guestUsername, elements.guestUsernameValidation, 'guest');
-  });
-  
-  // التحقق من كلمة المرور
-  elements.registerPassword.addEventListener('input', () => {
-    validatePassword(elements.registerPassword, elements.registerPasswordValidation);
-  });
-  
-  elements.registerConfirmPassword.addEventListener('input', () => {
-    validatePasswordConfirmation();
-  });
-  
-  // التحقق من العمر
-  elements.registerAge.addEventListener('input', () => {
-    validateAge(elements.registerAge, elements.registerAgeValidation);
-  });
-  
-  elements.guestAge.addEventListener('input', () => {
-    validateAge(elements.guestAge, elements.guestAgeValidation);
-  });
-}
-
-// ====== التحقق من البيانات ======
-function validateUsername(input, validationElement, formType) {
-  const username = input.value.trim();
-  const minLength = 3;
-  const maxLength = 14;
-  
-  if (!username) {
-    updateValidation(validationElement, 'يرجى إدخال اسم المستخدم', false);
-    return false;
-  }
-  
-  if (username.length < minLength) {
-    updateValidation(validationElement, `يجب أن يكون الاسم ${minLength} أحرف على الأقل`, false);
-    return false;
-  }
-  
-  if (username.length > maxLength) {
-    updateValidation(validationElement, `يجب ألا يزيد الاسم عن ${maxLength} حرف`, false);
-    return false;
-  }
-  
-  if (!/^[a-zA-Z\u0600-\u06FF0-9_\s]+$/.test(username)) {
-    updateValidation(validationElement, 'يسمح بالأحرف العربية، الإنجليزية، الأرقام والمسافات فقط', false);
-    return false;
-  }
-  
-  // التحقق من الأسماء المحجوزة
-  const reservedNames = ['محمد', 'admin', 'administrator', 'owner', 'moderator', 'system'];
-  if (reservedNames.includes(username.toLowerCase())) {
-    updateValidation(validationElement, 'اسم المستخدم محجوز', false);
-    return false;
-  }
-  
-  // حفظ البيانات مؤقتاً
-  formData[formType].username = username;
-  updateValidation(validationElement, 'الاسم صالح', true);
-  return true;
-}
-
-function validatePassword(input, validationElement) {
-  const password = input.value;
-  const minLength = 3;
-  const maxLength = 14;
-  
-  if (!password) {
-    updateValidation(validationElement, 'يرجى إدخال كلمة المرور', false);
-    return false;
-  }
-  
-  if (password.length < minLength) {
-    updateValidation(validationElement, `يجب أن تكون كلمة المرور ${minLength} أحرف على الأقل`, false);
-    return false;
-  }
-  
-  if (password.length > maxLength) {
-    updateValidation(validationElement, `يجب ألا تزيد كلمة المرور عن ${maxLength} حرف`, false);
-    return false;
-  }
-  
-  if (password.toLowerCase() === formData.register.username?.toLowerCase()) {
-    updateValidation(validationElement, 'كلمة المرور لا يجب أن تكون مثل اسم المستخدم', false);
-    return false;
-  }
-  
-  updateValidation(validationElement, 'كلمة المرور صالحة', true);
-  return true;
-}
-
-function validatePasswordConfirmation() {
-  const password = elements.registerPassword.value;
-  const confirmPassword = elements.registerConfirmPassword.value;
-  
-  if (!confirmPassword) {
-    return false;
-  }
-  
-  if (password !== confirmPassword) {
-    return false;
-  }
-  
-  return true;
-}
-
-function validateAge(input, validationElement) {
-  const age = parseInt(input.value);
-  
-  if (!input.value) {
-    updateValidation(validationElement, 'يرجى إدخال العمر', false);
-    return false;
-  }
-  
-  if (isNaN(age) || age < 1 || age > 99) {
-    updateValidation(validationElement, 'يجب أن يكون العمر بين 1 و 99', false);
-    return false;
-  }
-  
-  updateValidation(validationElement, 'العمر صالح', true);
-  return true;
-}
-
-function validateGender(genderInputs) {
-  const selectedGender = Array.from(genderInputs).find(input => input.checked);
-  return !!selectedGender;
-}
-
-function updateValidation(element, message, isValid) {
-  if (!element) return;
-  
-  element.textContent = message;
-  element.className = 'validation-message ' + (isValid ? 'success' : 'error');
-  element.innerHTML = `<i class="fas fa-${isValid ? 'check-circle' : 'exclamation-circle'}"></i> ${message}`;
-  
-  // تحديث حالة الحقل
-  const input = element.previousElementSibling?.querySelector('input, select');
-  if (input) {
-    if (isValid) {
-      input.classList.remove('error');
+// تبديل الوضع الفاتح/الداكن
+function toggleTheme() {
+    const body = document.body;
+    const modeIcon = document.getElementById('modeToggle');
+    
+    if (body.classList.contains('light-mode')) {
+        body.classList.remove('light-mode');
+        body.classList.add('dark-mode');
+        modeIcon.classList.remove('fa-moon');
+        modeIcon.classList.add('fa-sun');
+        localStorage.setItem('chat-theme', 'dark');
     } else {
-      input.classList.add('error');
+        body.classList.remove('dark-mode');
+        body.classList.add('light-mode');
+        modeIcon.classList.remove('fa-sun');
+        modeIcon.classList.add('fa-moon');
+        localStorage.setItem('chat-theme', 'light');
     }
-  }
 }
 
-// ====== التحقق من اسم المستخدم من السيرفر ======
-async function checkUsername(formType) {
-  const usernameInput = formType === 'register' ? elements.registerUsername : elements.guestUsername;
-  const validationElement = formType === 'register' ? elements.registerUsernameValidation : elements.guestUsernameValidation;
-  const checkButton = formType === 'register' ? elements.checkRegisterUsernameBtn : elements.checkGuestUsernameBtn;
-  
-  const username = usernameInput.value.trim();
-  
-  if (!validateUsername(usernameInput, validationElement, formType)) {
-    return;
-  }
-  
-  if (checkingUsername) return;
-  checkingUsername = true;
-  
-  try {
-    // تغيير حالة الزر
-    checkButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-    checkButton.disabled = true;
+// إضافة تأثيرات للحقول
+function addInputEffects() {
+    const inputs = document.querySelectorAll('input, select');
     
-    // محاكاة اتصال بالسيرفر
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    // التحقق من التكرار محلياً
-    const storedUsers = JSON.parse(localStorage.getItem('users') || '{}');
-    const exists = storedUsers[username?.toLowerCase()];
-    
-    if (exists) {
-      updateValidation(validationElement, 'اسم المستخدم محجوز', false);
-      addShakeEffect(usernameInput);
-    } else {
-      updateValidation(validationElement, 'اسم المستخدم متاح ✓', true);
-      addSuccessEffect(usernameInput);
-    }
-    
-  } catch (error) {
-    console.error('خطأ في التحقق:', error);
-    updateValidation(validationElement, 'خطأ في التحقق، حاول لاحقاً', false);
-  } finally {
-    checkingUsername = false;
-    checkButton.innerHTML = '<i class="fas fa-check"></i> تحقق';
-    checkButton.disabled = false;
-  }
+    inputs.forEach(input => {
+        // تأثير عند التركيز
+        input.addEventListener('focus', function() {
+            this.parentElement.classList.add('focused');
+        });
+        
+        // تأثير عند فقدان التركيز
+        input.addEventListener('blur', function() {
+            this.parentElement.classList.remove('focused');
+        });
+        
+        // تأثير التحقق من الصحة
+        input.addEventListener('input', function() {
+            validateField(this);
+        });
+    });
 }
 
-// ====== معالجة تسجيل الدخول للأعضاء ======
-async function handleMemberLogin() {
-  const username = elements.memberUsername.value.trim();
-  const password = elements.memberPassword.value;
-  
-  // التحقق الأساسي
-  if (!username || !password) {
-    showNotification('يرجى ملء جميع الحقول', 'error');
-    addShakeEffect(elements.memberLoginBtn);
-    return;
-  }
-  
-  try {
-    // عرض التحميل
-    elements.memberLoginBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الدخول...';
-    elements.memberLoginBtn.disabled = true;
+// التحقق من الحقل
+function validateField(field) {
+    const formGroup = field.parentElement;
+    const errorElement = formGroup.parentElement.querySelector('.error-message');
     
-    // تسجيل دخول خاص للمالك (سر بيننا)
-    if (username === 'محمد' && password === 'aumsalah079') {
-      // إظهار تأثير المالك
-      showOwnerEffect();
-      
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // حفظ بيانات المستخدم
-      const userData = {
-        username: 'محمد',
-        role: 'مالك',
-        serial: 1,
-        token: 'owner-token-' + Date.now(),
-        gender: 'ذكر',
-        age: 25,
-        country: 'السعودية',
-        gold: 999999,
-        points: 0,
-        nameColor: '#FFD700',
-        profileBg: 'gold_bg.jpg',
-        profileGlow: true,
-        frameAnimation: 'gold_frame.gif',
-        joinDate: new Date().toISOString()
-      };
-      
-      localStorage.setItem('currentUser', JSON.stringify(userData));
-      localStorage.setItem('userToken', userData.token);
-      
-      // إضافة للمستخدمين الأخيرة
-      addToRecentUsers(userData);
-      
-      // الانتقال للشات
-      window.location.href = 'chat.html';
-      return;
+    // إزالة رسائل الخطأ السابقة
+    if (errorElement) {
+        errorElement.style.display = 'none';
     }
     
-    // محاكاة الاتصال بالسيرفر
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // التحقق من الإدخال المطلوب
+    if (field.hasAttribute('required') && !field.value.trim()) {
+        showError(formGroup, 'هذا الحقل مطلوب');
+        return false;
+    }
     
-    // التحقق من المستخدمين المخزنين محلياً
-    const storedUsers = JSON.parse(localStorage.getItem('users') || '{}');
-    const user = storedUsers[username.toLowerCase()];
-    
-    if (!user) {
-      showNotification('اسم المستخدم أو كلمة المرور غير صحيحة', 'error');
-      addShakeEffect(elements.memberLoginBtn);
-      return;
+    // التحقق من طول الاسم
+    if (field.type === 'text' && field.id.includes('Username')) {
+        const username = field.value.trim();
+        if (username.length < 3) {
+            showError(formGroup, 'يجب أن يكون الاسم 3 أحرف على الأقل');
+            return false;
+        }
+        if (username.length > 14) {
+            showError(formGroup, 'يجب ألا يتجاوز الاسم 14 حرف');
+            return false;
+        }
     }
     
     // التحقق من كلمة المرور
-    const validPassword = await bcryptCompare(password, user.password);
-    if (!validPassword) {
-      showNotification('اسم المستخدم أو كلمة المرور غير صحيحة', 'error');
-      addShakeEffect(elements.memberLoginBtn);
-      return;
+    if (field.type === 'password') {
+        const password = field.value;
+        if (password.length < 3) {
+            showError(formGroup, 'يجب أن تكون كلمة المرور 3 أحرف على الأقل');
+            return false;
+        }
+        if (password.length > 14) {
+            showError(formGroup, 'يجب ألا تتجاوز كلمة المرور 14 حرف');
+            return false;
+        }
     }
     
-    // تحديث آخر دخول
-    user.lastSeen = new Date().toISOString();
-    storedUsers[username.toLowerCase()] = user;
-    localStorage.setItem('users', JSON.stringify(storedUsers));
+    // التحقق من العمر
+    if (field.id.includes('age')) {
+        const age = parseInt(field.value);
+        if (age < 1 || age > 99) {
+            showError(formGroup, 'يجب أن يكون العمر بين 1 و 99');
+            return false;
+        }
+    }
     
-    // توليد توكن
-    const token = generateToken(user);
+    // التحقق من تطابق كلمة المرور
+    if (field.id === 'confirmPassword') {
+        const password = document.getElementById('regPassword').value;
+        const confirmPassword = field.value;
+        
+        if (password !== confirmPassword) {
+            showError(formGroup, 'كلمة المرور غير متطابقة');
+            return false;
+        }
+    }
     
-    // حفظ بيانات المستخدم
-    const userData = {
-      username: user.username,
-      role: user.role,
-      serial: user.serial,
-      token: token,
-      gender: user.gender,
-      age: user.age,
-      country: user.country,
-      gold: user.gold || 0,
-      points: user.points || 0,
-      nameColor: user.nameColor || '#000000',
-      profileBg: user.profileBg || null,
-      profileGlow: user.profileGlow || false,
-      frameAnimation: user.frameAnimation || null,
-      joinDate: user.joinDate
-    };
+    return true;
+}
+
+// عرض رسالة الخطأ
+function showError(formGroup, message) {
+    let errorElement = formGroup.parentElement.querySelector('.error-message');
     
-    localStorage.setItem('currentUser', JSON.stringify(userData));
-    localStorage.setItem('userToken', token);
+    if (!errorElement) {
+        errorElement = document.createElement('p');
+        errorElement.className = 'error-message';
+        formGroup.parentElement.appendChild(errorElement);
+    }
     
-    // إضافة للمستخدمين الأخيرة
-    addToRecentUsers(userData);
+    errorElement.textContent = message;
+    errorElement.style.display = 'block';
     
-    // إظهار تأثير الدخول حسب الرتبة
-    showLoginEffect(user.role);
-    
-    // الانتقال للشات بعد التأثير
+    // اهتزاز الحقل
+    formGroup.classList.add('shake');
     setTimeout(() => {
-      window.location.href = 'chat.html';
-    }, 1200);
-    
-  } catch (error) {
-    console.error('خطأ في تسجيل الدخول:', error);
-    showNotification('حدث خطأ أثناء تسجيل الدخول', 'error');
-  } finally {
-    elements.memberLoginBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> دخول';
-    elements.memberLoginBtn.disabled = false;
-  }
+        formGroup.classList.remove('shake');
+    }, 500);
 }
 
-// ====== معالجة إنشاء حساب جديد ======
-async function handleRegister() {
-  // التحقق من جميع الحقول
-  const usernameValid = validateUsername(elements.registerUsername, elements.registerUsernameValidation, 'register');
-  const passwordValid = validatePassword(elements.registerPassword, elements.registerPasswordValidation);
-  const passwordMatch = validatePasswordConfirmation();
-  const ageValid = validateAge(elements.registerAge, elements.registerAgeValidation);
-  const genderValid = validateGender(elements.registerGender);
-  
-  if (!usernameValid || !passwordValid || !passwordMatch || !ageValid || !genderValid) {
-    showNotification('يرجى تصحيح الأخطاء في النموذج', 'error');
+// معالجة تسجيل الدخول
+function handleLogin() {
+    const username = document.getElementById('loginUsername').value.trim();
+    const password = document.getElementById('loginPassword').value;
+    const remember = document.getElementById('rememberMe').checked;
     
-    // هز الحقول غير الصالحة
-    if (!usernameValid) addShakeEffect(elements.registerUsername);
-    if (!passwordValid) addShakeEffect(elements.registerPassword);
-    if (!passwordMatch) addShakeEffect(elements.registerConfirmPassword);
-    if (!ageValid) addShakeEffect(elements.registerAge);
-    
-    return;
-  }
-  
-  const username = elements.registerUsername.value.trim();
-  const password = elements.registerPassword.value;
-  const age = parseInt(elements.registerAge.value);
-  const gender = Array.from(elements.registerGender).find(input => input.checked).value;
-  const serial = parseInt(elements.registerSerial.textContent);
-  
-  try {
-    // عرض التحميل
-    elements.registerBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري إنشاء الحساب...';
-    elements.registerBtn.disabled = true;
-    
-    // محاكاة اتصال بالسيرفر
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // التحقق من عدم التكرار
-    const storedUsers = JSON.parse(localStorage.getItem('users') || '{}');
-    if (storedUsers[username.toLowerCase()]) {
-      showNotification('اسم المستخدم محجوز بالفعل', 'error');
-      addShakeEffect(elements.registerUsername);
-      return;
+    // التحقق الأساسي
+    if (!username || !password) {
+        showError(document.querySelector('#loginSection .form-group'), 'يرجى ملء جميع الحقول');
+        return;
     }
     
-    // تشفير كلمة المرور
-    const hashedPassword = await bcryptHash(password);
+    if (username.length < 3 || username.length > 14) {
+        showError(document.querySelector('#loginSection .form-group'), 'اسم المستخدم يجب أن يكون بين 3 و 14 حرف');
+        return;
+    }
     
-    // إنشاء بيانات المستخدم
-    const user = {
-      username: username,
-      password: hashedPassword,
-      role: 'عضو',
-      serial: serial,
-      gender: gender,
-      age: age,
-      country: 'غير محدد',
-      joinDate: new Date().toISOString(),
-      gold: 0,
-      points: 0,
-      avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=3B82F6&color=fff`,
-      nameColor: '#000000',
-      profileBg: null,
-      profileGlow: false,
-      frameAnimation: null,
-      lastSeen: new Date().toISOString(),
-      likesReceived: 0,
-      likesGiven: [],
-      goldReceived: 0,
-      goldSent: 0
-    };
+    showLoading();
     
-    // حفظ المستخدم
-    storedUsers[username.toLowerCase()] = user;
-    localStorage.setItem('users', JSON.stringify(storedUsers));
+    // إرسال طلب تسجيل الدخول
+    fetch('/api/login', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            username: username,
+            password: password,
+            remember: remember
+        })
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('خطأ في الاتصال بالخادم');
+        }
+        return response.json();
+    })
+    .then(data => {
+        hideLoading();
+        
+        if (data.success) {
+            // حفظ الجلسة إذا طلب التذكر
+            if (remember) {
+                const sessionToSave = {
+                    username: username,
+                    password: password,
+                    remember: true,
+                    expiry: Date.now() + (30 * 24 * 60 * 60 * 1000) // 30 يوم
+                };
+                localStorage.setItem('chat-session', JSON.stringify(sessionToSave));
+            }
+            
+            // عرض رسالة نجاح
+            showSuccessMessage('تم تسجيل الدخول بنجاح! جاري التحويل...');
+            
+            // الانتقال للدردشة بعد تأخير قصير
+            setTimeout(() => {
+                window.location.href = '/chat.html';
+            }, 1500);
+        } else {
+            showError(document.querySelector('#loginSection .form-group'), data.message || 'اسم المستخدم أو كلمة المرور غير صحيحة');
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        showError(document.querySelector('#loginSection .form-group'), 'حدث خطأ في الاتصال بالخادم');
+        console.error('خطأ في تسجيل الدخول:', error);
+    });
+}
+
+// معالجة تسجيل حساب جديد
+function handleRegister() {
+    const username = document.getElementById('regUsername').value.trim();
+    const password = document.getElementById('regPassword').value;
+    const confirmPassword = document.getElementById('confirmPassword').value;
+    const gender = document.getElementById('gender').value;
+    const age = document.getElementById('age').value;
     
-    // توليد توكن
-    const token = generateToken(user);
+    // التحقق من جميع الحقول
+    const fields = [
+        { element: 'regUsername', value: username },
+        { element: 'regPassword', value: password },
+        { element: 'confirmPassword', value: confirmPassword },
+        { element: 'gender', value: gender },
+        { element: 'age', value: age }
+    ];
     
-    // حفظ بيانات المستخدم الحالي
-    const userData = {
-      username: user.username,
-      role: user.role,
-      serial: user.serial,
-      token: token,
-      gender: user.gender,
-      age: user.age,
-      country: user.country,
-      gold: user.gold,
-      points: user.points,
-      nameColor: user.nameColor,
-      profileBg: user.profileBg,
-      profileGlow: user.profileGlow,
-      frameAnimation: user.frameAnimation,
-      joinDate: user.joinDate
-    };
+    for (const field of fields) {
+        if (!field.value) {
+            const formGroup = document.getElementById(field.element).parentElement;
+            showError(formGroup, 'هذا الحقل مطلوب');
+            return;
+        }
+    }
     
-    localStorage.setItem('currentUser', JSON.stringify(userData));
-    localStorage.setItem('userToken', token);
+    // التحقق من صحة البيانات
+    if (username.length < 3 || username.length > 14) {
+        showError(document.getElementById('regUsername').parentElement, 'اسم المستخدم يجب أن يكون بين 3 و 14 حرف');
+        return;
+    }
     
-    // إضافة للمستخدمين الأخيرة
-    addToRecentUsers(userData);
+    if (password.length < 3 || password.length > 14) {
+        showError(document.getElementById('regPassword').parentElement, 'كلمة المرور يجب أن تكون بين 3 و 14 حرف');
+        return;
+    }
     
-    // إظهار رسالة النجاح
-    showNotification('تم إنشاء حسابك بنجاح! يتم تسجيل دخولك تلقائياً', 'success');
+    if (password !== confirmPassword) {
+        showError(document.getElementById('confirmPassword').parentElement, 'كلمة المرور غير متطابقة');
+        return;
+    }
     
-    // إظهار تأثير الدخول
-    showLoginEffect('عضو');
+    if (!gender) {
+        showError(document.getElementById('gender').parentElement, 'يرجى اختيار الجنس');
+        return;
+    }
     
-    // الانتقال للشات
+    const ageNum = parseInt(age);
+    if (ageNum < 1 || ageNum > 99) {
+        showError(document.getElementById('age').parentElement, 'يجب أن يكون العمر بين 1 و 99');
+        return;
+    }
+    
+    showLoading();
+    
+    // إرسال طلب التسجيل
+    fetch('/api/register', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            username: username,
+            password: password,
+            confirmPassword: confirmPassword,
+            gender: gender,
+            age: ageNum
+        })
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('خطأ في الاتصال بالخادم');
+        }
+        return response.json();
+    })
+    .then(data => {
+        hideLoading();
+        
+        if (data.success) {
+            // تسجيل الدخول تلقائياً بعد التسجيل
+            autoLoginAfterRegister(username, password);
+        } else {
+            showError(document.getElementById('regUsername').parentElement, data.message || 'حدث خطأ أثناء التسجيل');
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        showError(document.getElementById('regUsername').parentElement, 'حدث خطأ في الاتصال بالخادم');
+        console.error('خطأ في التسجيل:', error);
+    });
+}
+
+// تسجيل الدخول بعد التسجيل الناجح
+function autoLoginAfterRegister(username, password) {
+    showLoading();
+    
+    fetch('/api/login', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            username: username,
+            password: password,
+            remember: false
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideLoading();
+        
+        if (data.success) {
+            showSuccessMessage(`تم إنشاء حسابك بنجاح! رقمك التسلسلي: ${data.serialNumber}`);
+            
+            setTimeout(() => {
+                window.location.href = '/chat.html';
+            }, 2000);
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        console.error('خطأ في الدخول بعد التسجيل:', error);
+    });
+}
+
+// معالجة دخول الزائر
+function handleGuestLogin() {
+    const username = document.getElementById('guestUsername').value.trim();
+    const gender = document.getElementById('guestGender').value;
+    const age = document.getElementById('guestAge').value;
+    
+    // التحقق من البيانات
+    if (!username || !gender || !age) {
+        showError(document.querySelector('#guestSection .form-group'), 'يرجى ملء جميع الحقول');
+        return;
+    }
+    
+    if (username.length < 3 || username.length > 14) {
+        showError(document.getElementById('guestUsername').parentElement, 'الاسم يجب أن يكون بين 3 و 14 حرف');
+        return;
+    }
+    
+    const ageNum = parseInt(age);
+    if (ageNum < 1 || ageNum > 99) {
+        showError(document.getElementById('guestAge').parentElement, 'يجب أن يكون العمر بين 1 و 99');
+        return;
+    }
+    
+    showLoading();
+    
+    // إرسال طلب دخول الزائر
+    fetch('/api/guest', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            username: username,
+            gender: gender,
+            age: ageNum
+        })
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('خطأ في الاتصال بالخادم');
+        }
+        return response.json();
+    })
+    .then(data => {
+        hideLoading();
+        
+        if (data.success) {
+            showSuccessMessage('مرحباً بك كزائر! جاري التحويل للدردشة...');
+            
+            setTimeout(() => {
+                window.location.href = '/chat.html';
+            }, 1500);
+        } else {
+            showError(document.getElementById('guestUsername').parentElement, data.message || 'اسم المستخدم موجود مسبقاً');
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        showError(document.querySelector('#guestSection .form-group'), 'حدث خطأ في الاتصال بالخادم');
+        console.error('خطأ في دخول الزائر:', error);
+    });
+}
+
+// عرض رسالة النجاح
+function showSuccessMessage(message) {
+    // إنشاء عنصر رسالة النجاح
+    const successDiv = document.createElement('div');
+    successDiv.className = 'success-message';
+    successDiv.innerHTML = `
+        <i class="fas fa-check-circle"></i>
+        <span>${message}</span>
+    `;
+    
+    // إضافة الأنماط
+    successDiv.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: linear-gradient(45deg, #4CAF50, #2E7D32);
+        color: white;
+        padding: 15px 25px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        z-index: 10000;
+        animation: slideInRight 0.5s ease;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    `;
+    
+    document.body.appendChild(successDiv);
+    
+    // إزالة الرسالة بعد 3 ثوانٍ
     setTimeout(() => {
-      window.location.href = 'chat.html';
-    }, 1500);
+        successDiv.style.animation = 'slideOutRight 0.5s ease';
+        setTimeout(() => {
+            successDiv.remove();
+        }, 500);
+    }, 3000);
     
-  } catch (error) {
-    console.error('خطأ في إنشاء الحساب:', error);
-    showNotification('حدث خطأ أثناء إنشاء الحساب', 'error');
-  } finally {
-    elements.registerBtn.innerHTML = '<i class="fas fa-user-plus"></i> إنشاء حساب';
-    elements.registerBtn.disabled = false;
-  }
+    // إضافة الأنيميشن
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes slideInRight {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        @keyframes slideOutRight {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+        }
+    `;
+    document.head.appendChild(style);
 }
 
-// ====== معالجة تسجيل الزائر ======
-async function handleGuestLogin() {
-  // التحقق من الحقول
-  const usernameValid = validateUsername(elements.guestUsername, elements.guestUsernameValidation, 'guest');
-  const ageValid = validateAge(elements.guestAge, elements.guestAgeValidation);
-  const genderValid = validateGender(elements.guestGender);
-  
-  if (!usernameValid || !ageValid || !genderValid) {
-    showNotification('يرجى تصحيح الأخطاء في النموذج', 'error');
+// عرض نافذة التحميل
+function showLoading() {
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    loadingOverlay.style.display = 'flex';
     
-    if (!usernameValid) addShakeEffect(elements.guestUsername);
-    if (!ageValid) addShakeEffect(elements.guestAge);
+    // إضافة تأثيرات للتحميل
+    const spinner = loadingOverlay.querySelector('.spinner');
+    const text = loadingOverlay.querySelector('p');
     
-    return;
-  }
-  
-  const username = elements.guestUsername.value.trim();
-  const age = parseInt(elements.guestAge.value);
-  const gender = Array.from(elements.guestGender).find(input => input.checked).value;
-  const serial = parseInt(elements.guestSerial.textContent);
-  
-  try {
-    // عرض التحميل
-    elements.guestLoginBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الدخول...';
-    elements.guestLoginBtn.disabled = true;
+    // تغيير النص بشكل عشوائي
+    const loadingTexts = [
+        'جاري التحضير...',
+        'جاري تسجيل الدخول...',
+        'جاري إنشاء الحساب...',
+        'جاري التحقق من البيانات...',
+        'جاري الاتصال بالخادم...'
+    ];
     
-    // محاكاة اتصال بالسيرفر
-    await new Promise(resolve => setTimeout(resolve, 800));
+    let textIndex = 0;
+    const textInterval = setInterval(() => {
+        text.textContent = loadingTexts[textIndex];
+        textIndex = (textIndex + 1) % loadingTexts.length;
+    }, 2000);
     
-    // التحقق من عدم التكرار
-    const storedUsers = JSON.parse(localStorage.getItem('users') || '{}');
-    if (storedUsers[username.toLowerCase()]) {
-      showNotification('اسم المستخدم محجوز بالفعل', 'error');
-      addShakeEffect(elements.guestUsername);
-      return;
+    // حفظ معرف الفاصل للإزالة لاحقاً
+    loadingOverlay.textInterval = textInterval;
+}
+
+// إخفاء نافذة التحميل
+function hideLoading() {
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    
+    // إزالة الفاصل الزمني لتغيير النص
+    if (loadingOverlay.textInterval) {
+        clearInterval(loadingOverlay.textInterval);
     }
     
-    // إنشاء بيانات الزائر
-    const guestUser = {
-      username: username,
-      password: null,
-      role: 'ضيف',
-      serial: serial,
-      gender: gender,
-      age: age,
-      country: 'غير محدد',
-      joinDate: new Date().toISOString(),
-      gold: 0,
-      points: 0,
-      avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=6B7280&color=fff`,
-      nameColor: '#6B7280',
-      profileBg: null,
-      profileGlow: false,
-      frameAnimation: null,
-      lastSeen: new Date().toISOString(),
-      likesReceived: 0,
-      likesGiven: [],
-      goldReceived: 0,
-      goldSent: 0
-    };
-    
-    // حفظ الزائر
-    storedUsers[username.toLowerCase()] = guestUser;
-    localStorage.setItem('users', JSON.stringify(storedUsers));
-    
-    // توليد توكن
-    const token = generateToken(guestUser);
-    
-    // حفظ بيانات المستخدم الحالي
-    const userData = {
-      username: guestUser.username,
-      role: guestUser.role,
-      serial: guestUser.serial,
-      token: token,
-      gender: guestUser.gender,
-      age: guestUser.age,
-      country: guestUser.country,
-      gold: guestUser.gold,
-      points: guestUser.points,
-      nameColor: guestUser.nameColor,
-      profileBg: guestUser.profileBg,
-      profileGlow: guestUser.profileGlow,
-      frameAnimation: guestUser.frameAnimation,
-      joinDate: guestUser.joinDate
-    };
-    
-    localStorage.setItem('currentUser', JSON.stringify(userData));
-    localStorage.setItem('userToken', token);
-    
-    // إضافة للمستخدمين الأخيرة
-    addToRecentUsers(userData);
-    
-    // إظهار رسالة النجاح
-    showNotification('تم تسجيل دخولك كزائر', 'success');
-    
-    // الانتقال للشات
+    // التأخير قليلاً قبل الإخفاء
     setTimeout(() => {
-      window.location.href = 'chat.html';
-    }, 1000);
-    
-  } catch (error) {
-    console.error('خطأ في تسجيل الزائر:', error);
-    showNotification('حدث خطأ أثناء تسجيل الدخول', 'error');
-  } finally {
-    elements.guestLoginBtn.innerHTML = '<i class="fas fa-user-clock"></i> دخول كزائر';
-    elements.guestLoginBtn.disabled = false;
-  }
+        loadingOverlay.style.display = 'none';
+    }, 500);
 }
-
-// ====== توليد الأرقام التسلسلية ======
-function generateSerials() {
-  // الحصول على آخر رقم تسلسلي
-  const storedUsers = JSON.parse(localStorage.getItem('users') || '{}');
-  const maxSerial = Object.values(storedUsers).reduce((max, user) => {
-    return Math.max(max, user.serial || 0);
-  }, 1);
-  
-  // تعيين الأرقام الجديدة
-  elements.registerSerial.textContent = maxSerial + 1;
-  elements.guestSerial.textContent = maxSerial + 2;
-}
-
-// ====== وظائف المساعدة ======
-
-// توليد توكن
-function generateToken(user) {
-  return 'token-' + Date.now() + '-' + Math.random().toString(36).substr(2);
-}
-
-// تشفير كلمة المرور
-async function bcryptHash(password) {
-  // محاكاة تشفير بسيطة للعرض
-  return 'hashed_' + btoa(password);
-}
-
-async function bcryptCompare(password, hashedPassword) {
-  // محاكاة مقارنة بسيطة للعرض
-  return hashedPassword === 'hashed_' + btoa(password);
-}
-
-// إضافة المستخدم للأخيرة
-function addToRecentUsers(userData) {
-  const recentUsers = JSON.parse(localStorage.getItem('recentUsers') || '[]');
-  
-  // إزالة إذا كان موجوداً
-  const index = recentUsers.findIndex(u => u.username === userData.username);
-  if (index > -1) {
-    recentUsers.splice(index, 1);
-  }
-  
-  // إضافة في البداية
-  recentUsers.unshift({
-    username: userData.username,
-    role: userData.role,
-    serial: userData.serial
-  });
-  
-  // الاحتفاظ بآخر 5 فقط
-  if (recentUsers.length > 5) {
-    recentUsers.pop();
-  }
-  
-  localStorage.setItem('recentUsers', JSON.stringify(recentUsers));
-}
-
-// ====== التأثيرات ======
-
-// إظهار تأثير المالك
-function showOwnerEffect() {
-  const effect = document.createElement('div');
-  effect.className = 'owner-enter';
-  document.body.appendChild(effect);
-  
-  // إضافة جزيئات ذهب
-  for (let i = 0; i < 50; i++) {
-    setTimeout(() => {
-      addGoldParticle();
-    }, i * 30);
-  }
-  
-  // إزالة التأثير بعد الانتهاء
-  setTimeout(() => {
-    effect.remove();
-  }, 2000);
-}
-
-// إظهار تأثير الدخول حسب الرتبة
-function showLoginEffect(role) {
-  const effectClass = {
-    'مالك': 'owner-enter',
-    'اونر': 'honor-enter',
-    'ادمن': 'admin-enter',
-    'عضو مميز': 'vip-enter',
-    'عضو': '',
-    'ضيف': ''
-  }[role];
-  
-  if (effectClass) {
-    const effect = document.createElement('div');
-    effect.className = effectClass;
-    document.body.appendChild(effect);
-    
-    setTimeout(() => {
-      effect.remove();
-    }, 1500);
-  }
-}
-
-// إضافة جزيئات ذهب
-function addGoldParticle() {
-  const coin = document.createElement('div');
-  coin.className = 'coin';
-  
-  const size = Math.random() * 15 + 10;
-  const left = Math.random() * 100;
-  const duration = Math.random() * 1 + 0.5;
-  
-  coin.style.width = `${size}px`;
-  coin.style.height = `${size}px`;
-  coin.style.left = `${left}vw`;
-  coin.style.animationDuration = `${duration}s`;
-  
-  elements.particleEffect.appendChild(coin);
-  
-  setTimeout(() => {
-    coin.remove();
-  }, duration * 1000);
-}
-
-// إضافة تأثير تبديل النموذج
-function addFormSwitchEffect() {
-  const form = document.querySelector('.auth-form.active');
-  if (form) {
-    form.classList.add('fade-in');
-    setTimeout(() => {
-      form.classList.remove('fade-in');
-    }, 300);
-  }
-}
-
-// إضافة جزيئات خلفية
-function addParticles() {
-  for (let i = 0; i < 20; i++) {
-    setTimeout(() => {
-      const particle = document.createElement('div');
-      particle.className = 'particle';
-      particle.style.cssText = `
-        position: absolute;
-        width: ${Math.random() * 3 + 1}px;
-        height: ${Math.random() * 3 + 1}px;
-        background: ${i % 3 === 0 ? 'var(--primary-color)' : i % 3 === 1 ? 'var(--secondary-color)' : 'var(--success-color)'};
-        border-radius: 50%;
-        left: ${Math.random() * 100}vw;
-        top: ${Math.random() * 100}vh;
-        opacity: ${Math.random() * 0.5 + 0.2};
-        animation: float ${Math.random() * 3 + 2}s ease-in-out infinite;
-      `;
-      
-      elements.particleEffect.appendChild(particle);
-      
-      // إزالة بعد الأنيميشن
-      setTimeout(() => {
-        particle.remove();
-      }, 5000);
-    }, i * 100);
-  }
-}
-
-// بدء تأثيرات الخلفية
-function startBackgroundEffects() {
-  // أنيميشن للجزيئات
-  const style = document.createElement('style');
-  style.textContent = `
-    @keyframes float {
-      0%, 100% { transform: translateY(0) translateX(0); }
-      50% { transform: translateY(-20px) translateX(10px); }
-    }
-    
-    @keyframes pulse-glow {
-      0%, 100% { opacity: 0.3; }
-      50% { opacity: 0.6; }
-    }
-  `;
-  document.head.appendChild(style);
-  
-  // إضافة جزيئات بشكل دوري
-  addParticles();
-  setInterval(addParticles, 5000);
-  
-  // تأثير نبض للشعار
-  const logo = document.querySelector('.logo');
-  if (logo) {
-    logo.classList.add('logo-animation');
-  }
-}
-
-// تأثير الهز
-function addShakeEffect(element) {
-  element.classList.add('shake');
-  setTimeout(() => {
-    element.classList.remove('shake');
-  }, 500);
-}
-
-// تأثير النجاح
-function addSuccessEffect(element) {
-  element.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.3)';
-  setTimeout(() => {
-    element.style.boxShadow = '';
-  }, 1000);
-}
-
-// ====== التنبيهات ======
-function showNotification(message, type = 'info') {
-  const notification = document.createElement('div');
-  notification.className = `notification ${type}`;
-  
-  const icon = {
-    'success': 'check-circle',
-    'error': 'exclamation-circle',
-    'warning': 'exclamation-triangle',
-    'info': 'info-circle'
-  }[type];
-  
-  notification.innerHTML = `
-    <i class="fas fa-${icon}"></i>
-    <div class="content">
-      <p>${message}</p>
-    </div>
-    <button class="close"><i class="fas fa-times"></i></button>
-  `;
-  
-  elements.notificationsContainer.appendChild(notification);
-  
-  // حدث الإغلاق
-  notification.querySelector('.close').addEventListener('click', () => {
-    notification.remove();
-  });
-  
-  // إزالة تلقائية بعد 5 ثواني
-  setTimeout(() => {
-    if (notification.parentNode) {
-      notification.remove();
-    }
-  }, 5000);
-}
-
-// ====== ملء نموذج العضو ======
-function fillMemberForm(username) {
-  elements.memberUsername.value = username;
-  elements.memberPassword.focus();
-  switchForm('member');
-}
-
-// ====== إعداد أحداث Enter ======
-function setupEnterEvents() {
-  // دخول الأعضاء
-  elements.memberPassword.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-      handleMemberLogin();
-    }
-  });
-  
-  // تسجيل حساب جديد
-  elements.registerConfirmPassword.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-      handleRegister();
-    }
-  });
-  
-  // تسجيل زائر
-  elements.guestAge.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-      handleGuestLogin();
-    }
-  });
-}
-
-// ====== التحقق من الجلسة النشطة ======
-function checkActiveSession() {
-  const currentUser = localStorage.getItem('currentUser');
-  const token = localStorage.getItem('userToken');
-  
-  if (currentUser && token) {
-    // عرض خيار متابعة الجلسة
-    showSessionNotification(JSON.parse(currentUser));
-  }
-}
-
-function showSessionNotification(user) {
-  const notification = document.createElement('div');
-  notification.className = 'notification info';
-  notification.innerHTML = `
-    <i class="fas fa-user-check"></i>
-    <div class="content">
-      <h4>مرحباً بعودتك!</h4>
-      <p>${user.username} - الرتبة: ${user.role}</p>
-    </div>
-    <div class="actions">
-      <button class="btn-small" id="continueSessionBtn">متابعة</button>
-      <button class="btn-small btn-ghost" id="logoutBtn">تسجيل خروج</button>
-    </div>
-  `;
-  
-  elements.notificationsContainer.appendChild(notification);
-  
-  // أحداث الأزرار
-  notification.querySelector('#continueSessionBtn').addEventListener('click', () => {
-    window.location.href = 'chat.html';
-  });
-  
-  notification.querySelector('#logoutBtn').addEventListener('click', () => {
-    localStorage.removeItem('currentUser');
-    localStorage.removeItem('userToken');
-    notification.remove();
-    showNotification('تم تسجيل الخروج', 'success');
-  });
-  
-  // إزالة بعد 10 ثواني
-  setTimeout(() => {
-    if (notification.parentNode) {
-      notification.remove();
-    }
-  }, 10000);
-}
-
-// ====== الأزرار المساعدة ======
-function clearForm(formType) {
-  switch(formType) {
-    case 'member':
-      elements.memberUsername.value = '';
-      elements.memberPassword.value = '';
-      break;
-    case 'register':
-      elements.registerUsername.value = '';
-      elements.registerPassword.value = '';
-      elements.registerConfirmPassword.value = '';
-      elements.registerAge.value = '';
-      elements.registerGender.forEach(input => input.checked = false);
-      elements.registerUsernameValidation.textContent = '';
-      elements.registerPasswordValidation.textContent = '';
-      elements.registerAgeValidation.textContent = '';
-      break;
-    case 'guest':
-      elements.guestUsername.value = '';
-      elements.guestAge.value = '';
-      elements.guestGender.forEach(input => input.checked = false);
-      elements.guestUsernameValidation.textContent = '';
-      elements.guestAgeValidation.textContent = '';
-      break;
-  }
-}
-
-// ====== الأنيميشن للصفحة ======
-// تنشيط الأنيميشن عند تحميل الصفحة
-window.addEventListener('load', () => {
-  document.body.classList.add('loaded');
-  
-  // إضافة تأثير ظهور تدريجي
-  const elementsToAnimate = document.querySelectorAll('.welcome-card, .option-card');
-  elementsToAnimate.forEach((el, index) => {
-    setTimeout(() => {
-      el.style.opacity = '0';
-      el.style.transform = 'translateY(20px)';
-      el.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
-      
-      setTimeout(() => {
-        el.style.opacity = '1';
-        el.style.transform = 'translateY(0)';
-      }, 10);
-    }, index * 100);
-  });
-});
-
-// ====== وظائف عامة ======
-window.switchForm = switchForm;
-window.checkUsername = checkUsername;
-window.fillMemberForm = fillMemberForm;
-window.clearForm = clearForm;
