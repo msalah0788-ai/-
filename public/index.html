@@ -3,181 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>دردشة سوريا - تعارف بنات وشباب سوريا</title>
+    <title>شات متقدم - نظام رتب متكامل</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <style>
-        .theme-switch {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-        }
-        
-        .mode-icon {
-            font-size: 24px;
-            cursor: pointer;
-            color: #ff9800;
-        }
-    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800&display=swap" rel="stylesheet">
 </head>
-<body class="light-mode">
-    <div class="theme-switch">
-        <i class="fas fa-moon mode-icon" id="modeToggle"></i>
-    </div>
-
-    <div class="container" id="mainContainer">
-        <!-- الشعار والعنوان -->
-        <div class="header">
+<body class="theme-light">
+    <div class="container">
+        <!-- الهيدر -->
+        <header class="main-header">
             <div class="logo">
-                <i class="fas fa-comments"></i>
-                <h1>دردشة سوريا</h1>
+                <i class="fas fa-crown"></i>
+                <h1>شات متقدم</h1>
             </div>
-            <p class="subtitle">تعارف بنات وشباب سوريا</p>
-        </div>
+        </header>
 
-        <!-- إشعارات وشروط -->
-        <div class="notice">
-            <p><i class="fas fa-info-circle"></i> ملاحظة: إرسال الصور والفيديو عند وصولك لمستوى 10</p>
-            <p><i class="fas fa-star"></i> سجل حساب للتحدث خاص وعام وإرسال الصور والفيديو</p>
-            <p><i class="fas fa-gift"></i> واحصل على ميزات الشاشة والتأثيرات المميزة</p>
-        </div>
-
-        <!-- أقسام الدخول -->
-        <div class="sections-container">
-            <!-- قسم تسجيل الدخول -->
-            <div class="section" id="loginSection">
-                <h2><i class="fas fa-sign-in-alt"></i> تسجيل الدخول</h2>
-                <div class="form-group">
-                    <label for="loginUsername"><i class="fas fa-user"></i> اسم المستخدم</label>
-                    <input type="text" id="loginUsername" placeholder="أدخل اسم المستخدم" minlength="3" maxlength="14">
-                </div>
-                <div class="form-group">
-                    <label for="loginPassword"><i class="fas fa-lock"></i> كلمة المرور</label>
-                    <input type="password" id="loginPassword" placeholder="أدخل كلمة المرور" minlength="3" maxlength="14">
-                </div>
-                <div class="form-group">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="rememberMe">
-                        <span>تذكرني على هذا الجهاز</span>
-                    </label>
-                </div>
-                <button class="btn btn-primary" id="loginBtn">
-                    <i class="fas fa-sign-in-alt"></i> دخول الأعضاء
-                </button>
-                <p class="error-message" id="loginError"></p>
-            </div>
-
-            <!-- قسم إنشاء حساب جديد -->
-            <div class="section" id="registerSection">
-                <h2><i class="fas fa-user-plus"></i> إنشاء حساب جديد</h2>
-                <div class="form-group">
-                    <label for="regUsername"><i class="fas fa-user"></i> اسم المستخدم</label>
-                    <input type="text" id="regUsername" placeholder="3-14 حرف (عربي/انجليزي)" minlength="3" maxlength="14">
-                    <small>يجب أن يكون اسم المستخدم غير مكرر</small>
-                </div>
-                <div class="form-group">
-                    <label for="regPassword"><i class="fas fa-lock"></i> كلمة المرور</label>
-                    <input type="password" id="regPassword" placeholder="3-14 حرف" minlength="3" maxlength="14">
-                </div>
-                <div class="form-group">
-                    <label for="confirmPassword"><i class="fas fa-lock"></i> تأكيد كلمة المرور</label>
-                    <input type="password" id="confirmPassword" placeholder="أعد إدخال كلمة المرور" minlength="3" maxlength="14">
-                </div>
-                <div class="form-group">
-                    <label for="gender"><i class="fas fa-venus-mars"></i> اختر الجنس</label>
-                    <select id="gender">
-                        <option value="">-- اختر الجنس --</option>
-                        <option value="ذكر">ذكر</option>
-                        <option value="انثى">انثى</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="age"><i class="fas fa-birthday-cake"></i> العمر</label>
-                    <input type="number" id="age" placeholder="1 - 99" min="1" max="99">
-                </div>
-                <button class="btn btn-success" id="registerBtn">
-                    <i class="fas fa-user-plus"></i> إنشاء حساب
-                </button>
-                <p class="error-message" id="registerError"></p>
-            </div>
-
-            <!-- قسم الدخول كزائر -->
-            <div class="section" id="guestSection">
-                <h2><i class="fas fa-user-clock"></i> الدخول كزائر</h2>
-                <div class="form-group">
-                    <label for="guestUsername"><i class="fas fa-user"></i> الاسم</label>
-                    <input type="text" id="guestUsername" placeholder="3-14 حرف (غير مكرر)" minlength="3" maxlength="14">
-                    <small>يجب أن يكون الاسم غير مكرر للزوار</small>
-                </div>
-                <div class="form-group">
-                    <label for="guestGender"><i class="fas fa-venus-mars"></i> الجنس</label>
-                    <select id="guestGender">
-                        <option value="">-- اختر الجنس --</option>
-                        <option value="ذكر">ذكر</option>
-                        <option value="انثى">انثى</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="guestAge"><i class="fas fa-birthday-cake"></i> العمر</label>
-                    <input type="number" id="guestAge" placeholder="1 - 99" min="1" max="99">
-                </div>
-                <button class="btn btn-warning" id="guestBtn">
-                    <i class="fas fa-user-clock"></i> دخول كزائر
-                </button>
-                <p class="error-message" id="guestError"></p>
-            </div>
-        </div>
-
-        <!-- رسالة ترحيبية -->
-        <div class="welcome-message">
-            <div class="message-content">
-                <i class="fas fa-heart"></i>
-                <p>نورت 🌹 أحتفل بنا في دردشة سوريا</p>
-                <p class="emoji-line">😊😊😊😊😊😊😊😊😊😊😊</p>
-            </div>
-        </div>
-
-        <!-- معلومات النظام -->
-        <div class="system-info">
-            <h3><i class="fas fa-crown"></i> نظام الرتب والمميزات</h3>
-            <div class="ranks-grid">
-                <div class="rank-item" style="background: linear-gradient(45deg, #FFD700, #FFA500);">
-                    <i class="fas fa-crown"></i>
-                    <span>مالك</span>
-                </div>
-                <div class="rank-item" style="background: linear-gradient(45deg, #C0C0C0, #808080);">
-                    <i class="fas fa-gem"></i>
-                    <span>اونر</span>
-                </div>
-                <div class="rank-item" style="background: linear-gradient(45deg, #FF6B6B, #EE5A24);">
-                    <i class="fas fa-shield-alt"></i>
-                    <span>ادمن</span>
-                </div>
-                <div class="rank-item" style="background: linear-gradient(45deg, #48dbfb, #0abde3);">
-                    <i class="fas fa-star"></i>
-                    <span>عضو مميز</span>
-                </div>
-                <div class="rank-item" style="background: linear-gradient(45deg, #1dd1a1, #10ac84);">
-                    <i class="fas fa-user-check"></i>
-                    <span>عضو</span>
-                </div>
-                <div class="rank-item" style="background: linear-gradient(45deg, #f368e0, #ff9ff3);">
-                    <i class="fas fa-user-clock"></i>
-                    <span>ضيف</span>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- نافذة التحميل -->
-    <div class="loading-overlay" id="loadingOverlay">
-        <div class="loading-content">
-            <div class="spinner"></div>
-            <p>جاري التحضير...</p>
-        </div>
-    </div>
-
-    <script src="script.js"></script>
-</body>
-</html>
+        <!-- المحتوى الرئيسي -->
+        <main class="main-content">
+            <div class="welcome-card">
+                <h2><i class="fas fa-door-open"></i> اختر طريقة الدخول المناسبة لك</h2>
+                <p class="subtitle">انضم إلى مجتمعنا المتقدم واستمتع بميزات فريدة</p>
+                
+                <!-- خيارات الدخول -->
+                <div class="login-options">
+                    <!-- خيار 1: دخول الأعضاء -->
+                    <div class="option-card" id="memberLoginOption">
+                        <div class="option-icon">
+                            <i class="fas fa-users"></i>
+                        </
