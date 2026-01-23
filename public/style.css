@@ -351,3 +351,73 @@ body {
     color: rgba(255,255,255,0.7);
     font-size: 12px;
 }
+/* أضف هذه الأنماط في النهاية */
+
+/* الثيمات */
+body.light {
+    --primary-color: #4361ee;
+    --secondary-color: #3a0ca3;
+    --light-color: #f8f9fa;
+    --dark-color: #212529;
+    --message-bg: #ffffff;
+    --sidebar-bg: #ffffff;
+}
+
+body.dark {
+    --primary-color: #7209b7;
+    --secondary-color: #3a0ca3;
+    --light-color: #121212;
+    --dark-color: #f8f9fa;
+    --message-bg: #1e1e1e;
+    --sidebar-bg: #121212;
+    background: #121212;
+    color: #f8f9fa;
+}
+
+body.dark .chat-container {
+    background: #121212;
+}
+
+body.dark .sidebar {
+    background: #1e1e1e;
+    border-left-color: #333;
+}
+
+body.dark .chat-header {
+    background: #1e1e1e;
+    border-bottom-color: #333;
+}
+
+body.dark .message-text {
+    background: #2d2d2d;
+    color: #f8f9fa;
+}
+
+body.purple {
+    --primary-color: #9d4edd;
+    --secondary-color: #560bad;
+    --light-color: #f3e5f5;
+    --dark-color: #4a148c;
+}
+
+body.purple .login-container {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+body.purple .option-card {
+    background: rgba(255,255,255,0.9);
+}
+
+body.pink {
+    --primary-color: #f72585;
+    --secondary-color: #b5179e;
+    --light-color: #f8f0fa;
+    --dark-color: #7209b7;
+}
+
+body.blue {
+    --primary-color: #4cc9f0;
+    --secondary-color: #4361ee;
+    --light-color: #f0f8ff;
+    --dark-color: #1e6091;
+}
