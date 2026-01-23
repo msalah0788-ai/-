@@ -247,4 +247,230 @@ body {
     color: var(--dark-color);
 }
 
-/* منطقة الإ
+/* منطقة الإدخال */
+.chat-input-area {
+    padding: 20px 25px;
+    background: white;
+    border-top: 1px solid #e9ecef;
+}
+
+.input-container {
+    display: flex;
+    gap: 15px;
+    align-items: flex-end;
+}
+
+.message-input {
+    flex: 1;
+    border: 2px solid #e9ecef;
+    border-radius: 25px;
+    padding: 15px 20px;
+    font-size: 14px;
+    resize: none;
+    height: 50px;
+    max-height: 150px;
+    transition: border 0.3s;
+}
+
+.message-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.send-btn {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    border: none;
+    color: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s;
+}
+
+.send-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 5px 15px rgba(67, 97, 238, 0.4);
+}
+
+.input-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+    padding: 0 10px;
+}
+
+.input-action {
+    background: none;
+    border: none;
+    color: #6c757d;
+    cursor: pointer;
+    font-size: 20px;
+    transition: color 0.3s;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.input-action:hover {
+    color: var(--primary-color);
+    background: #f8f9fa;
+}
+
+/* تأثيرات الرتب */
+.message.owner .message-text {
+    border-left: 4px solid #FFD700;
+    background: linear-gradient(135deg, #fffaf0, #ffffff);
+}
+
+.message.minister .message-text {
+    border-left: 4px solid #9d4edd;
+}
+
+.message.vip .message-text {
+    border-left: 4px solid #4cc9f0;
+}
+
+/* اللمسات الجمالية */
+.owner-badge {
+    background: linear-gradient(135deg, #FFD700, #FFA500);
+    color: white;
+}
+
+.minister-badge {
+    background: linear-gradient(135deg, #9d4edd, #560bad);
+    color: white;
+}
+
+.vip-badge {
+    background: linear-gradient(135deg, #4cc9f0, #4361ee);
+    color: white;
+}
+
+.member-badge {
+    background: #6c757d;
+    color: white;
+}
+
+.guest-badge {
+    background: #f8f9fa;
+    color: #6c757d;
+    border: 1px solid #dee2e6;
+}
+
+/* مؤشر الكتابة */
+.typing-indicator {
+    padding: 10px 25px;
+    font-size: 12px;
+    color: #6c757d;
+    font-style: italic;
+    height: 20px;
+}
+
+/* شريط التنقل السفلي */
+.bottom-nav {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: white;
+    border-top: 1px solid #e9ecef;
+    padding: 10px;
+    justify-content: space-around;
+}
+
+.nav-btn {
+    background: none;
+    border: none;
+    color: #6c757d;
+    font-size: 20px;
+    cursor: pointer;
+    padding: 10px;
+    flex: 1;
+    text-align: center;
+}
+
+.nav-btn.active {
+    color: var(--primary-color);
+}
+
+/* التجاوب مع الشاشات الصغيرة */
+@media (max-width: 768px) {
+    .sidebar {
+        position: fixed;
+        right: -100%;
+        top: 0;
+        bottom: 0;
+        z-index: 1000;
+        transition: right 0.3s;
+    }
+    
+    .sidebar.active {
+        right: 0;
+    }
+    
+    .bottom-nav {
+        display: flex;
+    }
+    
+    .message-content {
+        max-width: 85%;
+    }
+}
+
+/* تأثيرات خاصة */
+.notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: white;
+    padding: 15px 20px;
+    border-radius: 10px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    z-index: 10000;
+    animation: slideInRight 0.3s ease;
+}
+
+@keyframes slideInRight {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+.pulse {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+/* تخصيص شريط التمرير */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
