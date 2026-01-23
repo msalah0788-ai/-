@@ -3,172 +3,354 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>شات متقدم - المحادثة</title>
+    <title>شات عربي - العمومية</title>
+    <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="chat.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link rel="icon" type="image/x-icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💬</text></svg>">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&family=Tajawal:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/emojionearea/3.4.2/emojionearea.min.css">
 </head>
 <body>
-    <!-- مؤشر التحميل -->
-    <div class="loading-overlay" id="loading-overlay">
-        <div class="loading-spinner"></div>
+    <!-- نافذة التحميل -->
+    <div id="loadingScreen" class="loading-screen">
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <p>جاري تحميل الشات...</p>
+        </div>
     </div>
-
-    <div class="chat-container">
-        <!-- الشريط الجانبي -->
-        <aside class="sidebar">
-            <!-- معلومات المستخدم -->
-            <div class="user-profile">
-                <img id="current-profile-pic" class="profile-pic" 
-                     src="" alt="الصورة الشخصية">
-                <div class="profile-info">
-                    <h3 id="current-username">...</h3>
-                    <span id="current-role" class="role">...</span>
+    
+    <!-- نافذة التسجيل/الدخول -->
+    <div id="loginModal" class="modal">
+        <div class="modal-content">
+            <h2>تسجيل الدخول</h2>
+            <div class="form-group">
+                <label for="modalUsername">اسم المستخدم</label>
+                <input type="text" id="modalUsername" placeholder="اسم المستخدم">
+            </div>
+            <div class="form-group">
+                <label for="modalPassword">كلمة المرور</label>
+                <input type="password" id="modalPassword" placeholder="كلمة المرور">
+            </div>
+            <div class="modal-buttons">
+                <button class="btn btn-primary" id="modalLoginBtn">دخول</button>
+                <button class="btn btn-secondary" id="modalRegisterBtn">إنشاء حساب</button>
+                <button class="btn btn-ghost" id="modalGuestBtn">الدخول كزائر</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- نافذة إنشاء حساب -->
+    <div id="registerModal" class="modal">
+        <div class="modal-content">
+            <h2>إنشاء حساب جديد</h2>
+            <div class="form-group">
+                <label for="newUsername">اسم المستخدم</label>
+                <input type="text" id="newUsername" placeholder="اختر اسم مستخدم فريد">
+                <div class="username-check">
+                    <span id="newUsernameStatus"></span>
+                    <button class="btn-small" id="checkNewUsernameBtn">تحقق</button>
                 </div>
             </div>
-
-            <!-- الأقسام -->
-            <div class="sidebar-sections">
-                <!-- الأعضاء المتصلين -->
-                <div class="section">
-                    <div class="section-header">
-                        <h3><i class="fas fa-users"></i> الأعضاء المتصلين</h3>
-                        <i class="fas fa-chevron-down"></i>
-                    </div>
-                    <div class="users-list" id="online-users-list">
-                        <!-- سيتم ملؤها بالجافاسكريبت -->
-                    </div>
-                </div>
-
-                <!-- جميع الأعضاء -->
-                <div class="section">
-                    <div class="section-header">
-                        <h3><i class="fas fa-address-book"></i> جميع الأعضاء</h3>
-                        <i class="fas fa-chevron-down"></i>
-                    </div>
-                    <div class="users-list collapsed" id="all-users-list">
-                        <!-- سيتم ملؤها بالجافاسكريبت -->
-                    </div>
-                </div>
-
-                <!-- الغرف المتاحة -->
-                <div class="section">
-                    <div class="section-header">
-                        <h3><i class="fas fa-hashtag"></i> الغرف المتاحة</h3>
-                        <i class="fas fa-chevron-down"></i>
-                    </div>
-                    <div class="users-list collapsed" id="rooms-list">
-                        <div class="user-item" style="background: #e3f2fd; border-left: 4px solid #4361ee;">
-                            <i class="fas fa-hashtag" style="color: #4361ee;"></i>
-                            <div class="user-details">
-                                <div class="user-name">العامة</div>
-                                <div class="user-meta">الغرفة الرئيسية</div>
-                            </div>
-                            <span class="user-role" style="background: #4361ee; color: white;">💬</span>
-                        </div>
-                    </div>
-                </div>
+            <div class="form-group">
+                <label for="newPassword">كلمة المرور</label>
+                <input type="password" id="newPassword" placeholder="كلمة المرور">
             </div>
-
-            <!-- الإجراءات السريعة -->
-            <div class="sidebar-footer">
-                <div class="quick-actions">
-                    <button class="action-button" title="الثيمات">
-                        <i class="fas fa-palette"></i>
-                        <span>الثيمات</span>
-                    </button>
-                    <button class="action-button" title="الإعدادات">
-                        <i class="fas fa-cog"></i>
-                        <span>الإعدادات</span>
-                    </button>
-                    <button class="action-button" title="خروج">
-                        <i class="fas fa-sign-out-alt"></i>
-                        <span>خروج</span>
-                    </button>
-                </div>
+            <div class="form-group">
+                <label for="confirmNewPassword">تأكيد كلمة المرور</label>
+                <input type="password" id="confirmNewPassword" placeholder="أعد كتابة كلمة المرور">
             </div>
-        </aside>
-
-        <!-- المنطقة الرئيسية -->
-        <main class="main-content">
-            <!-- رأس الشات -->
-            <header class="chat-header">
-                <div class="room-info">
-                    <h2><i class="fas fa-hashtag"></i> الغرفة العامة</h2>
-                    <p class="room-desc">محادثة عامة لجميع الأعضاء - شاركنا أفكارك!</p>
-                </div>
-                
-                <div class="room-actions">
-                    <button class="action-btn" id="toggle-sidebar" title="إظهار/إخفاء الأعضاء">
-                        <i class="fas fa-users"></i>
-                    </button>
-                    <button class="action-btn" title="بروفايلك">
-                        <i class="fas fa-user"></i>
-                    </button>
-                    <button class="action-btn" title="الأكثر تفاعلاً">
-                        <i class="fas fa-trophy"></i>
-                    </button>
-                    <button class="action-btn badge" title="الإشعارات">
-                        <i class="fas fa-bell"></i>
-                    </button>
-                </div>
-            </header>
-
-            <!-- منطقة الرسائل -->
-            <div class="chat-messages" id="chat-messages">
-                <!-- الرسائل تظهر هنا -->
-                <div class="empty-state" id="empty-state">
-                    <i class="fas fa-comments"></i>
-                    <h3>مرحباً في الشات!</h3>
-                    <p>ابدأ المحادثة الآن مع الأعضاء المتصلين</p>
-                    <div style="margin-top: 20px; color: #999; font-size: 13px;">
-                        <i class="fas fa-lightbulb"></i> نصائح:
-                        <ul style="text-align: right; margin-top: 10px; padding-right: 20px;">
-                            <li>استخدم @اسم للمنشن</li>
-                            <li>اضغط Enter للإرسال</li>
-                            <li>Shift+Enter للسطر الجديد</li>
-                        </ul>
+            <div class="modal-buttons">
+                <button class="btn btn-primary" id="confirmRegisterBtn">إنشاء حساب</button>
+                <button class="btn btn-ghost" id="backToLoginBtn">العودة لتسجيل الدخول</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- نافذة تعديل الملف الشخصي -->
+    <div id="profileModal" class="modal profile-modal">
+        <div class="modal-content">
+            <h2>تعديل الملف الشخصي</h2>
+            <div class="profile-avatar-section">
+                <div class="avatar-preview">
+                    <img id="avatarPreview" src="https://ui-avatars.com/api/?name=زائر&background=666&color=fff" alt="">
+                    <div class="avatar-overlay">
+                        <i class="fas fa-camera"></i>
                     </div>
+                </div>
+                <div class="avatar-options">
+                    <button class="btn btn-small" id="uploadAvatarBtn"><i class="fas fa-upload"></i> رفع صورة</button>
+                    <button class="btn btn-small" id="captureAvatarBtn"><i class="fas fa-camera"></i> التقاط صورة</button>
                 </div>
             </div>
             
-            <!-- مؤشر الكتابة -->
-            <div class="typing-indicator" id="typing-indicator" style="display: none;"></div>
-
-            <!-- منطقة الإدخال -->
-            <div class="chat-input-area">
-                <div class="input-container">
-                    <textarea id="message-input" class="message-input" 
-                              placeholder="اكتب رسالتك هنا... (اضغط Enter للإرسال، @لذكر مستخدم)" 
-                              rows="1"></textarea>
-                    <button id="send-btn" class="send-btn" title="إرسال">
-                        <i class="fas fa-paper-plane"></i>
-                    </button>
+            <div class="profile-customization">
+                <h3><i class="fas fa-paint-brush"></i> تخصيص النص</h3>
+                
+                <div class="customization-group">
+                    <label for="fontSelect"><i class="fas fa-font"></i> الخط</label>
+                    <select id="fontSelect">
+                        <option value="Arial, sans-serif">Arial</option>
+                        <option value="'Cairo', sans-serif" selected>Cairo</option>
+                        <option value="'Tajawal', sans-serif">Tajawal</option>
+                        <option value="'Simplified Arabic', sans-serif">Simplified Arabic</option>
+                        <option value="Tahoma, sans-serif">Tahoma</option>
+                        <option value="'Segoe UI', sans-serif">Segoe UI</option>
+                    </select>
                 </div>
                 
-                <!-- أزرار الإجراءات -->
-                <div class="input-actions">
-                    <button class="input-action" title="إرسال صورة">
-                        <i class="fas fa-image"></i>
-                    </button>
-                    <button class="input-action" title="إرسال ملف">
-                        <i class="fas fa-paperclip"></i>
-                    </button>
-                    <button class="input-action" title="إرسال تعبير">
-                        <i class="fas fa-smile"></i>
-                    </button>
-                    <button class="input-action" title="تسجيل صوتي">
-                        <i class="fas fa-microphone"></i>
-                    </button>
-                    <button class="input-action" title="إرسال GIF">
-                        <i class="fas fa-film"></i>
-                    </button>
+                <div class="customization-group">
+                    <label><i class="fas fa-text-height"></i> حجم النص</label>
+                    <div class="font-size-options">
+                        <label class="font-size-option">
+                            <input type="radio" name="fontSize" value="small">
+                            <span>صغير</span>
+                        </label>
+                        <label class="font-size-option">
+                            <input type="radio" name="fontSize" value="medium" checked>
+                            <span>متوسط</span>
+                        </label>
+                        <label class="font-size-option">
+                            <input type="radio" name="fontSize" value="large">
+                            <span>كبير</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="customization-group">
+                    <label for="colorPicker"><i class="fas fa-palette"></i> لون النص</label>
+                    <div class="color-picker-container">
+                        <input type="color" id="colorPicker" value="#000000">
+                        <span id="colorValue">#000000</span>
+                    </div>
+                </div>
+                
+                <div class="preview-text" id="textPreview">
+                    هذه معاينة لمظهر رسائلك في الشات
                 </div>
             </div>
-        </main>
+            
+            <div class="modal-buttons">
+                <button class="btn btn-primary" id="saveProfileBtn">حفظ التغييرات</button>
+                <button class="btn btn-ghost" id="cancelProfileBtn">إلغاء</button>
+            </div>
+        </div>
     </div>
-
-    <script src="/socket.io/socket.io.js"></script>
+    
+    <!-- نافذة إرفاق الملفات -->
+    <div id="attachmentModal" class="modal">
+        <div class="modal-content">
+            <h2>إرفاق ملف</h2>
+            <div class="attachment-options">
+                <button class="attachment-option" id="attachImageBtn">
+                    <i class="fas fa-image"></i>
+                    <span>صورة</span>
+                </button>
+                <button class="attachment-option" id="attachVideoBtn">
+                    <i class="fab fa-youtube"></i>
+                    <span>فيديو يوتيوب</span>
+                </button>
+                <button class="attachment-option" id="attachAudioBtn">
+                    <i class="fas fa-microphone"></i>
+                    <span>تسجيل صوتي</span>
+                </button>
+            </div>
+            <div class="modal-buttons">
+                <button class="btn btn-ghost" id="cancelAttachmentBtn">إلغاء</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- نافذة التسجيل الصوتي -->
+    <div id="recordModal" class="modal">
+        <div class="modal-content">
+            <h2>تسجيل صوتي</h2>
+            <div class="recorder">
+                <div class="recorder-status" id="recorderStatus">
+                    <i class="fas fa-microphone"></i>
+                    <span>جاهز للتسجيل</span>
+                </div>
+                <div class="recorder-timer" id="recorderTimer">
+                    00:60
+                </div>
+                <div class="recorder-controls">
+                    <button class="btn btn-danger" id="recordBtn">
+                        <i class="fas fa-circle"></i> بدء التسجيل
+                    </button>
+                    <button class="btn btn-secondary" id="stopRecordBtn" disabled>
+                        <i class="fas fa-stop"></i> إيقاف
+                    </button>
+                </div>
+                <div class="recorder-preview" id="recorderPreview" style="display: none;">
+                    <audio controls id="audioPreview"></audio>
+                </div>
+            </div>
+            <div class="modal-buttons">
+                <button class="btn btn-primary" id="sendRecordingBtn" disabled>إرسال التسجيل</button>
+                <button class="btn btn-ghost" id="cancelRecordingBtn">إلغاء</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- الهيكل الرئيسي للشات -->
+    <div class="chat-container" id="chatContainer" style="display: none;">
+        <!-- الشريط العلوي -->
+        <header class="chat-header">
+            <div class="header-left">
+                <button class="menu-btn" id="menuBtn">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <div class="logo">
+                    <i class="fas fa-comments"></i>
+                    <h1>شات عربي</h1>
+                </div>
+            </div>
+            
+            <div class="header-center">
+                <div class="room-info">
+                    <span class="room-icon" id="roomIcon"><i class="fas fa-hashtag"></i></span>
+                    <span class="room-name" id="currentRoomName">العمومية</span>
+                    <span class="room-members" id="roomMembersCount"><i class="fas fa-user"></i> 0</span>
+                </div>
+            </div>
+            
+            <div class="header-right">
+                <button class="header-btn" id="notificationsBtn">
+                    <i class="fas fa-bell"></i>
+                    <span class="badge" id="notificationBadge">0</span>
+                </button>
+                <button class="header-btn" id="privateChatBtn">
+                    <i class="fas fa-envelope"></i>
+                    <span class="badge" id="privateBadge">0</span>
+                </button>
+                <button class="header-btn" id="diaryBtn">
+                    <i class="fas fa-book"></i>
+                </button>
+                <div class="user-menu" id="userMenu">
+                    <div class="user-avatar">
+                        <img id="userAvatar" src="https://ui-avatars.com/api/?name=زائر&background=666&color=fff" alt="">
+                    </div>
+                    <span class="user-name" id="userName">زائر</span>
+                    <i class="fas fa-chevron-down"></i>
+                </div>
+            </div>
+        </header>
+        
+        <!-- القائمة الجانبية -->
+        <div class="sidebar" id="sidebar">
+            <div class="sidebar-section">
+                <h3><i class="fas fa-door-open"></i> الغرف</h3>
+                <div class="rooms-list" id="roomsList">
+                    <!-- سيتم ملؤها بالجافاسكريبت -->
+                </div>
+            </div>
+            
+            <div class="sidebar-section">
+                <h3><i class="fas fa-users"></i> الأعضاء المتصلون (<span id="onlineCount">0</span>)</h3>
+                <div class="users-list" id="usersList">
+                    <!-- سيتم ملؤها بالجافاسكريبت -->
+                </div>
+            </div>
+        </div>
+        
+        <!-- منطقة المحادثة الرئيسية -->
+        <main class="chat-main">
+            <div class="messages-container" id="messagesContainer">
+                <!-- سيتم ملؤها بالجافاسكريبت -->
+                <div class="welcome-message">
+                    <div class="welcome-icon">
+                        <i class="fas fa-comments"></i>
+                    </div>
+                    <h2>مرحباً بك في الشات العربي</h2>
+                    <p>اختر غرفة من القائمة الجانبية لبدء المحادثة</p>
+                </div>
+            </div>
+            
+            <!-- منطقة إدخال الرسائل -->
+            <div class="message-input-container" id="messageInputContainer">
+                <div class="input-actions">
+                    <button class="input-btn" id="emojiBtn">
+                        <i class="far fa-smile"></i>
+                    </button>
+                    <button class="input-btn" id="attachmentBtn">
+                        <i class="fas fa-paperclip"></i>
+                    </button>
+                </div>
+                <div class="message-input-wrapper">
+                    <input type="text" 
+                           id="messageInput" 
+                           placeholder="اكتب رسالة..." 
+                           disabled>
+                    <div class="attachment-preview" id="attachmentPreview"></div>
+                </div>
+                <button class="send-btn" id="sendBtn" disabled>
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
+            <div class="login-notice" id="loginNotice">
+                <i class="fas fa-exclamation-circle"></i> يجب تسجيل الدخول للكتابة
+            </div>
+        </main>
+        
+        <!-- نافذة المحادثات الخاصة -->
+        <div class="private-chat-sidebar" id="privateChatSidebar">
+            <div class="private-chat-header">
+                <h3><i class="fas fa-envelope"></i> المحادثات الخاصة</h3>
+                <button class="close-private-btn" id="closePrivateBtn">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="private-chats-list" id="privateChatsList">
+                <!-- قائمة المحادثات الخاصة -->
+            </div>
+        </div>
+    </div>
+    
+    <!-- نافذة اليوميات -->
+    <div id="diaryModal" class="modal diary-modal">
+        <div class="modal-content">
+            <div class="diary-header">
+                <h2><i class="fas fa-book"></i> حائط اليوميات</h2>
+                <button class="btn btn-primary" id="newPostBtn"><i class="fas fa-plus"></i> منشور جديد</button>
+            </div>
+            <div class="diary-posts" id="diaryPosts">
+                <!-- المنشورات ستظهر هنا -->
+            </div>
+        </div>
+    </div>
+    
+    <!-- نافذة إنشاء منشور جديد -->
+    <div id="newPostModal" class="modal">
+        <div class="modal-content">
+            <h2>منشور جديد</h2>
+            <div class="form-group">
+                <textarea id="postContent" placeholder="ماذا تفكر؟" rows="5"></textarea>
+            </div>
+            <div class="post-attachments" id="postAttachments"></div>
+            <div class="modal-buttons">
+                <button class="btn btn-primary" id="publishPostBtn">نشر</button>
+                <button class="btn btn-ghost" id="cancelPostBtn">إلغاء</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- نافذة الإيموجي -->
+    <div id="emojiModal" class="emoji-modal">
+        <div class="emoji-header">
+            <div class="emoji-categories">
+                <button class="emoji-category active" data-category="smileys">😀 وجوه</button>
+                <button class="emoji-category" data-category="animals">🐻 حيوانات</button>
+                <button class="emoji-category" data-category="food">🍕 أطعمة</button>
+                <button class="emoji-category" data-category="activities">⚽ أنشطة</button>
+            </div>
+        </div>
+        <div class="emoji-grid" id="emojiGrid">
+            <!-- الإيموجي سيتم إضافتها بالجافاسكريبت -->
+        </div>
+    </div>
+    
+    <!-- مكتبات خارجية -->
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/emojionearea/3.4.2/emojionearea.min.js"></script>
     <script src="chat.js"></script>
 </body>
 </html>
