@@ -10,12 +10,13 @@ const io = socketIo(server);
 
 // بيانات التطبيق
 const users = {};
+const onlineUsers = {};
 const messages = { general: [] };
 const rooms = ['general'];
 const friendships = {};
 const userDataFile = 'users.json';
 
-// تحميل بيانات المستخدمين من ملف
+// تحميل بيانات المستخدمين
 let userData = {};
 if (fs.existsSync(userDataFile)) {
     userData = JSON.parse(fs.readFileSync(userDataFile, 'utf8'));
@@ -26,23 +27,33 @@ function saveUserData() {
     fs.writeFileSync(userDataFile, JSON.stringify(userData, null, 2));
 }
 
-// تعريف رتب المالك
-userData['mohammad'] = {
-    password: 'aumsalah079',
-    gender: 'ذكر',
-    age: 30,
-    role: 'مالك',
-    joinDate: new Date().toISOString(),
-    interaction: 1000,
-    profilePic: 'default_male.png',
-    profileColor: '#FFD700',
-    serial: 1
-};
+// تهيئة المالك إذا لم يكن موجوداً
+if (!userData['mohammad']) {
+    userData['mohammad'] = {
+        password: 'aumsalah079',
+        gender: 'ذكر',
+        age: 30,
+        role: 'مالك',
+        joinDate: new Date().toISOString(),
+        interaction: 1000,
+        profilePic: 'https://ui-avatars.com/api/?name=محمد&background=FFD700&color=000&size=256',
+        profileColor: '#FFD700',
+        coverPhoto: '',
+        serial: 1,
+        friends: [],
+        friendRequests: [],
+        bio: 'مالك الشات',
+        status: 'نشط',
+        privateChatEnabled: true,
+        title: 'المؤسس'
+    };
+    saveUserData();
+}
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
-// API لتسجيل الدخول
+// API للتسجيل والدخول
 app.post('/api/login', (req, res) => {
     const { username, password } = req.body;
     
@@ -53,7 +64,9 @@ app.post('/api/login', (req, res) => {
                 username,
                 role: userData[username].role,
                 gender: userData[username].gender,
-                profilePic: userData[username].profilePic
+                profilePic: userData[username].profilePic,
+                profileColor: userData[username].profileColor,
+                serial: userData[username].serial
             }
         });
     } else {
@@ -61,7 +74,6 @@ app.post('/api/login', (req, res) => {
     }
 });
 
-// API للتسجيل
 app.post('/api/register', (req, res) => {
     const { username, password, gender, age } = req.body;
     
@@ -71,9 +83,11 @@ app.post('/api/register', (req, res) => {
         res.json({ success: false, message: 'اسم المستخدم يجب أن يكون 3 أحرف على الأقل' });
     } else if (password.length < 4) {
         res.json({ success: false, message: 'كلمة السر يجب أن تكون 4 أحرف على الأقل' });
+    } else if (age < 13 || age > 100) {
+        res.json({ success: false, message: 'العمر يجب أن يكون بين 13 و 100 سنة' });
     } else {
-        // إنشاء رقم تسلسلي
         const serial = Object.keys(userData).length + 1;
+        const profilePic = `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=${gender === 'أنثى' ? 'FF69B4' : '1E90FF'}&color=fff&size=256`;
         
         userData[username] = {
             password,
@@ -82,27 +96,107 @@ app.post('/api/register', (req, res) => {
             role: 'عضو',
             joinDate: new Date().toISOString(),
             interaction: 0,
-            profilePic: gender === 'أنثى' ? 'default_female.png' : 'default_male.png',
+            profilePic,
             profileColor: gender === 'أنثى' ? '#FF69B4' : '#1E90FF',
+            coverPhoto: '',
             serial,
             friends: [],
             friendRequests: [],
             bio: 'مرحباً! أنا جديد هنا.',
             status: 'نشط',
-            privateChatEnabled: true
+            privateChatEnabled: true,
+            title: ''
         };
         
         saveUserData();
         res.json({ 
             success: true, 
-            message: 'تم التسجيل بنجاح',
             user: {
                 username,
                 role: 'عضو',
                 gender,
-                profilePic: userData[username].profilePic
+                profilePic,
+                profileColor: userData[username].profileColor,
+                serial
             }
         });
+    }
+});
+
+// API للحصول على معلومات المستخدم
+app.get('/api/user/:username', (req, res) => {
+    const { username } = req.params;
+    if (userData[username]) {
+        const { password, ...userInfo } = userData[username];
+        res.json({ success: true, user: userInfo });
+    } else {
+        res.json({ success: false, message: 'المستخدم غير موجود' });
+    }
+});
+
+// API لتحديث البروفايل
+app.post('/api/update-profile', (req, res) => {
+    const { username, updates } = req.body;
+    
+    if (userData[username]) {
+        Object.keys(updates).forEach(key => {
+            if (key !== 'password' && key !== 'role' && key !== 'serial') {
+                userData[username][key] = updates[key];
+            }
+        });
+        saveUserData();
+        res.json({ success: true, message: 'تم تحديث البروفايل' });
+    } else {
+        res.json({ success: false, message: 'المستخدم غير موجود' });
+    }
+});
+
+// API لإدارة الرتب
+app.post('/api/manage-role', (req, res) => {
+    const { adminUsername, targetUsername, newRole } = req.body;
+    
+    if (!userData[adminUsername] || !userData[targetUsername]) {
+        return res.json({ success: false, message: 'المستخدم غير موجود' });
+    }
+    
+    const adminRole = userData[adminUsername].role;
+    const targetRole = userData[targetUsername].role;
+    
+    // صلاحيات تغيير الرتب
+    if (adminRole === 'مالك') {
+        // المالك يستطيع تغيير أي رتبة
+        userData[targetUsername].role = newRole;
+        
+        // تحديث لون البروفايل حسب الرتبة الجديدة
+        if (newRole === 'مالك') {
+            userData[targetUsername].profileColor = '#FFD700';
+        } else if (newRole === 'وزير' || newRole === 'وزيرة') {
+            userData[targetUsername].profileColor = '#9d4edd';
+        } else if (newRole === 'عضو مميز') {
+            userData[targetUsername].profileColor = '#4cc9f0';
+        }
+        
+        saveUserData();
+        
+        // إرسال إشعار للجميع
+        io.emit('role updated', {
+            targetUsername,
+            newRole,
+            by: adminUsername
+        });
+        
+        res.json({ success: true, message: `تم تحديث رتبة ${targetUsername} إلى ${newRole}` });
+    } else if (adminRole === 'وزير' || adminRole === 'وزيرة') {
+        // الوزير لا يستطيع تغيير رتبة المالك
+        if (targetRole === 'مالك') {
+            return res.json({ success: false, message: 'لا يمكنك تعديل رتبة المالك' });
+        }
+        userData[targetUsername].role = newRole;
+        saveUserData();
+        io.emit('role updated', { targetUsername, newRole, by: adminUsername });
+        res.json({ success: true, message: `تم تحديث رتبة ${targetUsername}` });
+    } else {
+        res.json({ success: false, message: 'ليس لديك الصلاحية لتغيير الرتب' });
     }
 });
 
@@ -117,13 +211,27 @@ io.on('connection', (socket) => {
             role: userData.role,
             gender: userData.gender,
             profilePic: userData.profilePic,
+            profileColor: userData.profileColor,
+            serial: userData.serial,
             room: 'general',
             isGuest: userData.isGuest || false
         };
 
+        onlineUsers[userData.username] = {
+            ...users[socket.id],
+            lastSeen: new Date().toISOString()
+        };
+
         socket.join('general');
-        io.emit('user joined', users[socket.id]);
-        io.emit('update users', Object.values(users));
+        
+        // إرسال إشعار دخول
+        io.emit('user joined', {
+            username: userData.username,
+            role: userData.role
+        });
+        
+        // تحديث قائمة المستخدمين
+        io.emit('update users', Object.values(onlineUsers));
     });
 
     socket.on('send message', (data) => {
@@ -143,14 +251,31 @@ io.on('connection', (socket) => {
 
         // زيادة التفاعل للمستخدم
         if (!user.isGuest && data.text.length >= 4) {
-            userData[user.username].interaction += 1;
-            saveUserData();
+            if (userData[user.username]) {
+                userData[user.username].interaction += 1;
+                saveUserData();
+            }
         }
 
         if (!messages[message.room]) messages[message.room] = [];
         messages[message.room].push(message);
 
         io.to(message.room).emit('receive message', message);
+        
+        // إرسال إشعار إذا تم منشن المستخدم
+        const mentionedUsers = data.text.match(/@(\w+)/g);
+        if (mentionedUsers) {
+            mentionedUsers.forEach(mention => {
+                const mentionedUsername = mention.substring(1);
+                if (userData[mentionedUsername]) {
+                    io.emit('user mentioned', {
+                        mentioned: mentionedUsername,
+                        by: user.username,
+                        message: data.text
+                    });
+                }
+            });
+        }
     });
 
     socket.on('typing', (data) => {
@@ -166,9 +291,22 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => {
         const user = users[socket.id];
         if (user) {
-            io.emit('user left', user.username);
+            // تحديث آخر ظهور
+            if (userData[user.username]) {
+                userData[user.username].lastSeen = new Date().toISOString();
+                saveUserData();
+            }
+            
+            // إزالة من المتصلين
+            delete onlineUsers[user.username];
+            
+            io.emit('user left', {
+                username: user.username,
+                role: user.role
+            });
+            
+            io.emit('update users', Object.values(onlineUsers));
             delete users[socket.id];
-            io.emit('update users', Object.values(users));
         }
     });
 });
