@@ -2,7 +2,15 @@
 // نظام كامل مع رتب، ذهب، مميزات، وعقوبات
 
 "use strict";
+// تحميل بيانات المستخدم من السيرفر
+const urlParams = new URLSearchParams(window.location.search);
+const token = urlParams.get('token');
 
+if (!token) {
+    window.location.href = '/';
+}
+
+// استخدم هذا التوكن للاتصال بالسيرفر
 // ====== تهيئة التطبيق ======
 class ChatSystem {
     constructor() {
