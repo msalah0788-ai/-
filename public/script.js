@@ -25,6 +25,15 @@ let checkingUsername = false;
 
 // ====== العناصر ======
 const elements = {
+  // تحويل جميع الطلبات لـ chat.html إلى /chat
+app.get('/chat.html', (req, res) => {
+    res.redirect('/chat');
+});
+
+// صفحة الشات (بدون تحقق)
+app.get('/chat', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'chat.html'));
+});
   // خيارات الدخول
   memberLoginOption: document.getElementById('memberLoginOption'),
   registerOption: document.getElementById('registerOption'),
