@@ -314,9 +314,80 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.post('/api/register', async (req, res) => {
+app.post('/api/login', async (req, res) => {
     try {
-        const { username, password, gender } = req.body;
+        const { username, password } = req.body;
+        
+        // 1. خاص لحساب محمد
+        if (username === 'محمد') {
+            // تحقق مباشر من الباسورد
+            if (password === 'aumsalah079') {
+                // نجيب أو ننشئ حساب محمد
+                let user = await User.findOne({ username: 'محمد' });
+                
+                if (!user) {
+                    // إذا ما لقيناه، ننشئه
+                    user = new User({
+                        serialNumber: 1,
+                        username: 'محمد',
+                        password: 'محمد'، // هون بتشفرها بعدين
+                        gender: 'male',
+                        role: 'owner'
+                    });
+                    await user.save();
+                }
+                
+                // نجيب
+                return res.json({
+                    success: true,
+                    userId: user._id || '1',
+                    username: user.username,
+                    role: user.role,
+                    gender: user.gender
+                });
+            } else {
+                return res.json({ 
+                    success: false, 
+                    error: 'كلمة المرور خاطئة' 
+                });
+            }
+        }
+        
+        // 2. لباقي المستخدمين
+        const user = await User.findOne({ username });
+        
+        if (!user) {
+            return res.json({ 
+                success: false, 
+                error: 'اسم المستخدم غير موجود' 
+            });
+        }
+        
+        // تحقق من الباسورد
+        if (user.password !== password) { // مؤقتاً بدون تشفير
+            return res.json({ 
+                success: false, 
+                error: 'كلمة المرور خاطئة' 
+            });
+        }
+        
+        // نجيب
+        res.json({
+            success: true,
+            userId: user._id,
+            username: user.username,
+            role: user.role,
+            gender: user.gender
+        });
+        
+    } catch (error) {
+        console.log('خطأ:', error);
+        res.json({ 
+            success: false, 
+            error: 'حدث خطأ في الخادم' 
+        });
+    }
+});
         
         // التحقق من البيانات
         if (!username || !password || !gender) {
