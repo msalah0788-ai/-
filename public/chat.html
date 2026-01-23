@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>شات متقدم - المحادثة</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="chat.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="chat-page">
+    <!-- الهيكل الرئيسي -->
+    <div class="chat-container">
+        <!-- الشريط العلوي -->
+        <header class="chat-header">
+            <button class="menu-btn" id="menuBtn">
+                <i class="fas fa-bars"></i>
+            </button>
+            
+            <div class="header-center">
+                <h1><i class="fas fa-comments"></i> الروم العام</h1>
+                <div class="room-info">
+                    <span id="onlineCount">0</span> متصل
+                </div>
+            </div>
+            
+            <div class="header-actions">
+                <button class="header-btn" id="themeBtn">
+                    <i class="fas fa-palette"></i>
+                </button>
+                <button class="header-btn" id="profileBtn">
+                    <i class="fas fa-user"></i>
+                </button>
+            </div>
+        </header>
+        
+        <!-- المحتوى الرئيسي -->
+        <main class="chat-main">
+            <!-- قائمة الأعضاء (اليمين) -->
+            <aside class="members-sidebar" id="membersSidebar">
+                <div class="sidebar-header">
+                    <h3><i class="fas fa-users"></i> الأعضاء</h3>
+                    <button class="close-sidebar" id="closeSidebar">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                
+                <!-- قائمة المتصلين -->
+                <div class="online-section">
+                    <h4><i class="fas fa-circle online-icon"></i> متصلون (<span id="onlineCount2">0</span>)</h4>
+                    <div class="members-list" id="onlineList">
+                        <!-- الأعضاء المتصلين يظهرون هنا -->
+                    </div>
+                </div>
+                
+                <!-- قائمة غير المتصلين -->
+                <div class="offline-section">
+                    <h4><i class="fas fa-circle offline-icon"></i> غير متصل</h4>
+                    <div class="members-list" id="offlineList">
+                        <!-- الأعضاء غير المتصلين -->
+                    </div>
+                </div>
+            </aside>
+            
+            <!-- منطقة المحادثة (الوسط) -->
+            <section class="chat-area">
+                <!-- الرسائل -->
+                <div class="messages-container" id="messagesContainer">
+                    <!-- الرسائل تظهر هنا -->
+                </div>
+                
+                <!-- أدوات الإرسال -->
+                <div class="message-tools">
+                    <button class="tool-btn" id="imageBtn">
+                        <i class="fas fa-image"></i>
+                    </button>
+                    <button class="tool-btn" id="audioBtn">
+                        <i class="fas fa-microphone"></i>
+                    </button>
+                    <button class="tool-btn" id="gifBtn">
+                        <i class="fas fa-smile"></i>
+                    </button>
+                    <button class="tool-btn" id="emojiBtn">
+                        <i class="far fa-smile"></i>
+                    </button>
+                </div>
+                
+                <!-- حقل الإرسال -->
+                <div class="message-input-area">
+                    <input type="text" 
+                           id="messageInput" 
+                           placeholder="اكتب رسالتك هنا..." 
+                           autocomplete="off">
+                    <button class="send-btn" id="sendBtn">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+            </section>
+        </main>
+        
+        <!-- قائمة القائمة الجانبية (عند النقر على ☰) -->
+        <div class="side-menu" id="sideMenu">
+            <div class="menu-header">
+                <h3><i class="fas fa-bars"></i> القائمة</h3>
+                <button class="close-menu" id="closeMenu">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="menu-items">
+                <a href="#" class="menu-item" id="newsWallBtn">
+                    <i class="fas fa-newspaper"></i>
+                    <span>حائط الأخبار</span>
+                </a>
+                
+                <a href="#" class="menu-item" id="topUsersBtn">
+                    <i class="fas fa-trophy"></i>
+                    <span>أعلى 3 متفاعلين</span>
+                </a>
+                
+                <a href="#" class="menu-item" id="privateChatBtn">
+                    <i class="fas fa-comment-dots"></i>
+                    <span>المحادثات الخاصة</span>
+                    <span class="badge" id="privateBadge">0</span>
+                </a>
+                
+                <a href="#" class="menu-item" id="friendsBtn">
+                    <i class="fas fa-user-friends"></i>
+                    <span>الأصدقاء</span>
+                    <span class="badge" id="friendsBadge">0</span>
+                </a>
+                
+                <a href="#" class="menu-item" id="settingsBtn">
+                    <i class="fas fa-cog"></i>
+                    <span>الإعدادات</span>
+                </a>
+            </div>
+            
+            <div class="menu-footer">
+                <div class="user-info">
+                    <img src="" alt="Avatar" class="user-avatar" id="userAvatar">
+                    <div>
+                        <strong id="userName">مستخدم</strong>
+                        <span class="user-role" id="userRole">زائر</span>
+                    </div>
+                </div>
+                <button class="logout-btn" id="logoutBtn">
+                    <i class="fas fa-sign-out-alt"></i> خروج
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- المودالات والإشعارات -->
+    <div id="notificationArea"></div>
+    
+    <!-- مكتبات -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="chat.js"></script>
+</body>
+</html>
