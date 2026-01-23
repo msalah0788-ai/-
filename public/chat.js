@@ -1,364 +1,273 @@
-// ====== المتغيرات العامة ======
-let socket = null;
-let currentUser = null;
-let onlineUsers = [];
+// متغيرات الشات
+let socket;
+let currentUser;
+let currentRoom = 'general';
+let typingTimeout;
 
-// ====== التهيئة ======
-document.addEventListener('DOMContentLoaded', function() {
+// تهيئة الشات
+function initChat() {
     // تحميل بيانات المستخدم
-    loadUser();
-    
-    // الاتصال بالسوكيت
-    connectSocket();
-    
-    // إضافة المستمعين للأحداث
-    setupEventListeners();
-    
-    // تحديث واجهة المستخدم
-    updateUI();
-});
-
-// ====== تحميل بيانات المستخدم ======
-function loadUser() {
-    const userData = localStorage.getItem('user');
-    if (!userData) {
-        window.location.href = '/';
+    const savedUser = localStorage.getItem('chatUser');
+    if (!savedUser) {
+        window.location.href = 'index.html';
         return;
     }
     
-    currentUser = JSON.parse(userData);
-    console.log('المستخدم الحالي:', currentUser);
-}
-
-// ====== الاتصال بالسوكيت ======
-function connectSocket() {
+    currentUser = JSON.parse(savedUser);
+    displayUserInfo();
+    
+    // الاتصال بالسيرفر
     socket = io();
     
-    socket.on('connect', () => {
-        console.log('✅ متصل بالخادم');
-        
-        // انضمام للمستخدم
-        socket.emit('join', {
-            userId: currentUser.userId,
-            username: currentUser.username,
-            role: currentUser.role,
-            gender: currentUser.gender,
-            avatar: currentUser.avatar
-        });
+    // الانضمام للشات
+    socket.emit('join', {
+        username: currentUser.username,
+        role: currentUser.role,
+        gender: currentUser.gender,
+        profilePic: currentUser.profilePic,
+        isGuest: currentUser.isGuest || false
     });
     
-    // استقبال قائمة المتصلين
-    socket.on('online users', (users) => {
-        onlineUsers = users;
-        updateOnlineUsers();
-    });
-    
-    // استقبال رسالة جديدة
-    socket.on('new message', (message) => {
-        addMessage(message, 'incoming');
-    });
-    
-    // استقبال إشعار دخول
-    socket.on('user joined', (data) => {
-        showJoinNotification(data);
-    });
-    
-    // استقبال إشعار خروج
-    socket.on('user left', (data) => {
-        showLeaveNotification(data);
-    });
+    // إعداد المستمعين
+    setupEventListeners();
 }
 
-// ====== تحديث قائمة المتصلين ======
-function updateOnlineUsers() {
-    const onlineCount = onlineUsers.length;
+// عرض معلومات المستخدم
+function displayUserInfo() {
+    document.getElementById('current-username').textContent = currentUser.username;
+    document.getElementById('current-role').textContent = currentUser.role;
+    document.getElementById('current-profile-pic').src = `https://ui-avatars.com/api/?name=${currentUser.username}&background=${currentUser.gender === 'أنثى' ? 'FF69B4' : '1E90FF'}&color=fff&size=128`;
     
-    // تحديث العداد
-    document.querySelectorAll('#onlineCount, #onlineCount2').forEach(el => {
-        el.textContent = onlineCount;
-    });
-    
-    // قائمة المتصلين
-    const onlineList = document.getElementById('onlineList');
-    const offlineList = document.getElementById('offlineList');
-    
-    onlineList.innerHTML = '';
-    offlineList.innerHTML = '';
-    
-    // يمكنك هنا إضافة المستخدمين غير المتصلين من قاعدة البيانات
-    // حالياً نعرض فقط المتصلين
-    
-    onlineUsers.forEach(user => {
-        const memberItem = createMemberItem(user);
-        onlineList.appendChild(memberItem);
-    });
+    // إضافة رمز الرتبة
+    const roleBadge = document.getElementById('current-role');
+    roleBadge.className = 'role';
+    roleBadge.classList.add(`${getRoleClass(currentUser.role)}-badge`);
 }
 
-// ====== إنشاء عنصر عضو ======
-function createMemberItem(user) {
-    const div = document.createElement('div');
-    div.className = 'member-item';
-    
-    // أسماء الرتب بالعربية
-    const roleNames = {
-        'owner': 'مالك',
-        'minister': user.gender === 'male' ? 'وزير' : 'وزيرة',
-        'premium_member': 'مميز',
-        'member': 'عضو',
-        'guest': 'زائر'
-    };
-    
-    // ألوان الرتب
-    const roleColors = {
-        'owner': 'role-owner',
-        'minister': 'role-minister',
-        'premium_member': 'role-premium',
-        'member': 'role-member',
-        'guest': 'role-guest'
-    };
-    
-    const roleName = roleNames[user.role] || 'زائر';
-    const roleClass = roleColors[user.role] || 'role-guest';
-    
-    // الحرف الأول من الاسم
-    const firstChar = user.username.charAt(0);
-    
-    div.innerHTML = `
-        <div class="member-avatar">
-            ${firstChar}
-        </div>
-        <div class="member-info">
-            <div class="member-name">${user.username}</div>
-            <div class="member-role">
-                <span class="role-badge ${roleClass}">${roleName}</span>
-            </div>
-        </div>
-    `;
-    
-    // حدث النقر لعرض البروفايل
-    div.addEventListener('click', () => {
-        showProfile(user);
-    });
-    
-    return div;
-}
-
-// ====== إضافة رسالة ======
-function addMessage(message, type) {
-    const container = document.getElementById('messagesContainer');
-    
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `message message-${type}`;
-    
-    // تحديد إذا كانت رسالة نظام
-    if (message.senderRole === 'system') {
-        messageDiv.className = 'system-message';
-        messageDiv.innerHTML = `
-            <div class="message-content">
-                ${message.content}
-            </div>
-        `;
-    } else {
-        // رسالة عادية
-        const isOwner = message.senderRole === 'owner';
-        const isMinister = message.senderRole === 'minister';
-        
-        messageDiv.innerHTML = `
-            <div class="message-header">
-                <span class="message-sender ${isOwner ? 'owner-name' : ''}">
-                    ${message.senderName}
-                    ${isOwner ? ' 👑' : ''}
-                    ${isMinister ? ' ⭐' : ''}
-                </span>
-                <span class="message-time">${message.time}</span>
-            </div>
-            <div class="message-content">
-                <div class="message-text">${message.content}</div>
-            </div>
-        `;
-        
-        // إضافة تأثيرات خاصة
-        if (isOwner) {
-            messageDiv.classList.add('owner-effect');
-        } else if (isMinister) {
-            messageDiv.classList.add('minister-effect');
-        }
-    }
-    
-    container.appendChild(messageDiv);
-    
-    // التمرير للأسفل
-    container.scrollTop = container.scrollHeight;
-}
-
-// ====== إرسال رسالة ======
-function sendMessage() {
-    const input = document.getElementById('messageInput');
-    const message = input.value.trim();
-    
-    if (!message) return;
-    
-    if (socket && currentUser) {
-        socket.emit('send message', {
-            userId: currentUser.userId,
-            username: currentUser.username,
-            role: currentUser.role,
-            content: message,
-            messageType: 'text'
-        });
-        
-        // إضافة الرسالة محلياً
-        addMessage({
-            senderName: 'أنت',
-            content: message,
-            time: new Date().toLocaleTimeString(),
-            senderRole: currentUser.role
-        }, 'outgoing');
-        
-        // مسح الحقل
-        input.value = '';
-        input.focus();
-    }
-}
-
-// ====== إشعارات الدخول والخروج ======
-function showJoinNotification(data) {
-    const container = document.getElementById('messagesContainer');
-    
-    const notification = document.createElement('div');
-    notification.className = 'system-message';
-    
-    // إضافة تأثيرات حسب الرتبة
-    let effectClass = '';
-    if (data.effect === 'owner_effect') {
-        effectClass = 'owner-effect';
-    } else if (data.effect === 'minister_effect') {
-        effectClass = 'minister-effect';
-    }
-    
-    notification.innerHTML = `
-        <div class="message-content ${effectClass}">
-            <i class="fas fa-door-open"></i> 
-            ${data.username} (${data.role}) دخل الغرفة
-        </div>
-    `;
-    
-    container.appendChild(notification);
-    container.scrollTop = container.scrollHeight;
-}
-
-function showLeaveNotification(data) {
-    const container = document.getElementById('messagesContainer');
-    
-    const notification = document.createElement('div');
-    notification.className = 'system-message';
-    
-    notification.innerHTML = `
-        <div class="message-content">
-            <i class="fas fa-door-closed"></i> 
-            ${data.username} غادر الغرفة
-        </div>
-    `;
-    
-    container.appendChild(notification);
-    container.scrollTop = container.scrollHeight;
-}
-
-// ====== عرض البروفايل ======
-function showProfile(user) {
-    // هنا يمكنك إنشاء نافذة البروفايل
-    alert(`بروفايل: ${user.username}\nالرتبة: ${user.role}\nالجنس: ${user.gender === 'male' ? 'ذكر' : 'أنثى'}`);
-}
-
-// ====== إعداد المستمعين للأحداث ======
+// إعداد المستمعين للأحداث
 function setupEventListeners() {
-    // إرسال الرسالة
-    const sendBtn = document.getElementById('sendBtn');
-    const messageInput = document.getElementById('messageInput');
+    // استقبال الرسائل
+    socket.on('receive message', (message) => {
+        addMessageToChat(message);
+    });
     
-    sendBtn.addEventListener('click', sendMessage);
-    messageInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
+    // تحديث قائمة المستخدمين
+    socket.on('update users', (users) => {
+        updateOnlineUsers(users);
+    });
+    
+    // عند دخول مستخدم جديد
+    socket.on('user joined', (user) => {
+        showNotification(`${user.username} انضم للشات`, 'success');
+    });
+    
+    // عند خروج مستخدم
+    socket.on('user left', (username) => {
+        showNotification(`${username} غادر الشات`, 'info');
+    });
+    
+    // عند الكتابة
+    socket.on('user typing', (data) => {
+        showTypingIndicator(data);
+    });
+    
+    // إرسال الرسالة
+    document.getElementById('send-btn').addEventListener('click', sendMessage);
+    document.getElementById('message-input').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
             sendMessage();
         }
     });
     
-    // فتح/إغلاق القائمة
-    const menuBtn = document.getElementById('menuBtn');
-    const closeMenu = document.getElementById('closeMenu');
-    const sideMenu = document.getElementById('sideMenu');
-    
-    menuBtn.addEventListener('click', () => {
-        sideMenu.classList.add('active');
+    // إظهار/إخفاء الشريط الجانبي
+    document.getElementById('toggle-sidebar').addEventListener('click', () => {
+        document.querySelector('.sidebar').classList.toggle('active');
     });
     
-    closeMenu.addEventListener('click', () => {
-        sideMenu.classList.remove('active');
-    });
-    
-    // فتح/إغلاق قائمة الأعضاء
-    const closeSidebar = document.getElementById('closeSidebar');
-    const membersSidebar = document.getElementById('membersSidebar');
-    
-    closeSidebar.addEventListener('click', () => {
-        membersSidebar.classList.remove('active');
-    });
-    
-    // يمكنك إضافة زر لفتح قائمة الأعضاء في الهيدر
-    // أضف هذا في chat.html:
-    // <button class="header-btn" id="membersBtn"><i class="fas fa-users"></i></button>
-    
-    // الخروج
-    const logoutBtn = document.getElementById('logoutBtn');
-    logoutBtn.addEventListener('click', () => {
-        localStorage.removeItem('user');
-        window.location.href = '/';
+    // إدارة الكتابة
+    document.getElementById('message-input').addEventListener('input', () => {
+        socket.emit('typing', {
+            username: currentUser.username,
+            isTyping: true,
+            room: currentRoom
+        });
+        
+        clearTimeout(typingTimeout);
+        typingTimeout = setTimeout(() => {
+            socket.emit('typing', {
+                username: currentUser.username,
+                isTyping: false,
+                room: currentRoom
+            });
+        }, 1000);
     });
 }
 
-// ====== تحديث واجهة المستخدم ======
-function updateUI() {
-    if (currentUser) {
-        // تحديث الاسم والرتبة
-        document.getElementById('userName').textContent = currentUser.username;
+// إرسال رسالة
+function sendMessage() {
+    const input = document.getElementById('message-input');
+    const message = input.value.trim();
+    
+    if (message && currentUser) {
+        socket.emit('send message', {
+            text: message,
+            room: currentRoom
+        });
         
-        const roleNames = {
-            'owner': '👑 مالك الموقع',
-            'minister': currentUser.gender === 'male' ? '⭐ وزير' : '⭐ وزيرة',
-            'premium_member': currentUser.gender === 'male' ? '💎 عضو مميز' : '💎 عضوة مميزة',
-            'member': currentUser.gender === 'male' ? '👤 عضو' : '👤 عضوة',
-            'guest': '👤 زائر'
-        };
+        input.value = '';
+        input.style.height = '50px';
         
-        document.getElementById('userRole').textContent = roleNames[currentUser.role] || '👤 زائر';
-        
-        // تحديث الصورة (الحرف الأول)
-        const avatar = document.getElementById('userAvatar');
-        avatar.textContent = currentUser.username.charAt(0);
-        
-        // إضافة رسالة ترحيب
-        setTimeout(() => {
-            addMessage({
-                senderName: 'النظام',
-                content: `مرحباً ${currentUser.username}! تم الاتصال بالشات العام`,
-                time: new Date().toLocaleTimeString(),
-                senderRole: 'system'
-            }, 'incoming');
-        }, 1000);
+        // إعلام بالتوقف عن الكتابة
+        socket.emit('typing', {
+            username: currentUser.username,
+            isTyping: false,
+            room: currentRoom
+        });
     }
 }
 
-// ====== إظهار إشعار ======
-function showNotification(message, type = 'info') {
-    const area = document.getElementById('notificationArea');
+// إضافة رسالة للشات
+function addMessageToChat(message) {
+    const messagesContainer = document.getElementById('chat-messages');
+    const messageElement = document.createElement('div');
     
+    const roleClass = getRoleClass(message.role);
+    const genderClass = message.gender === 'أنثى' ? 'female' : 'male';
+    
+    messageElement.className = `message ${roleClass} ${genderClass}`;
+    messageElement.innerHTML = `
+        <div class="message-user">
+            <img src="https://ui-avatars.com/api/?name=${message.username}&background=${message.gender === 'أنثى' ? 'FF69B4' : '1E90FF'}&color=fff&size=128" 
+                 alt="${message.username}">
+            <span class="role-badge ${roleClass}-badge">${message.role}</span>
+        </div>
+        <div class="message-content">
+            <div class="message-header">
+                <h4>${message.username}</h4>
+                <span class="message-time">${message.timestamp}</span>
+            </div>
+            <div class="message-text">${escapeHtml(message.text)}</div>
+        </div>
+    `;
+    
+    messagesContainer.appendChild(messageElement);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+// تحديث قائمة المستخدمين المتصلين
+function updateOnlineUsers(users) {
+    const usersList = document.getElementById('online-users-list');
+    usersList.innerHTML = '';
+    
+    const sortedUsers = users.sort((a, b) => {
+        const roleOrder = { 'مالك': 1, 'وزير': 2, 'وزيرة': 2, 'عضو مميز': 3, 'عضو': 4, 'زائر': 5 };
+        return (roleOrder[a.role] || 6) - (roleOrder[b.role] || 6);
+    });
+    
+    sortedUsers.forEach(user => {
+        const userItem = document.createElement('div');
+        userItem.className = 'user-item';
+        userItem.innerHTML = `
+            <span class="status"></span>
+            <img src="https://ui-avatars.com/api/?name=${user.username}&background=${user.gender === 'أنثى' ? 'FF69B4' : '1E90FF'}&color=fff&size=64" 
+                 width="30" height="30" style="border-radius:50%;">
+            <div>
+                <div style="font-weight:500;">${user.username}</div>
+                <div class="user-role ${getRoleClass(user.role)}-badge" style="display:inline-block; margin-top:2px; font-size:10px; padding:1px 6px;">
+                    ${user.role}
+                </div>
+            </div>
+        `;
+        usersList.appendChild(userItem);
+    });
+}
+
+// عرض مؤشر الكتابة
+function showTypingIndicator(data) {
+    const typingIndicator = document.getElementById('typing-indicator');
+    if (data.isTyping) {
+        typingIndicator.textContent = `${data.username} يكتب...`;
+        typingIndicator.style.display = 'block';
+    } else {
+        typingIndicator.style.display = 'none';
+    }
+}
+
+// عرض الإشعارات
+function showNotification(message, type = 'info') {
     const notification = document.createElement('div');
     notification.className = `notification ${type}`;
-    notification.textContent = message;
+    notification.innerHTML = `
+        <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
+        <span>${message}</span>
+    `;
     
-    area.appendChild(notification);
+    document.body.appendChild(notification);
     
     setTimeout(() => {
         notification.remove();
     }, 3000);
 }
+
+// وظائف مساعدة
+function getRoleClass(role) {
+    const roleMap = {
+        'مالك': 'owner',
+        'وزير': 'minister',
+        'وزيرة': 'minister',
+        'عضو مميز': 'vip',
+        'عضو': 'member',
+        'زائر': 'guest'
+    };
+    return roleMap[role] || 'member';
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// تكبير/تصغير صورة المستخدم
+function zoomProfilePic(element) {
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.9);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 10000;
+        cursor: pointer;
+    `;
+    
+    const img = document.createElement('img');
+    img.src = element.src;
+    img.style.cssText = `
+        max-width: 90%;
+        max-height: 90%;
+        border-radius: 10px;
+        box-shadow: 0 0 30px rgba(255,255,255,0.2);
+    `;
+    
+    modal.appendChild(img);
+    document.body.appendChild(modal);
+    
+    modal.addEventListener('click', () => {
+        modal.remove();
+    });
+}
+
+// تهيئة الشات عند تحميل الصفحة
+document.addEventListener('DOMContentLoaded', initChat);
+
+// السماح بتحريك منطقة الإدخال
+document.getElementById('message-input').addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = (this.scrollHeight) + 'px';
+});
