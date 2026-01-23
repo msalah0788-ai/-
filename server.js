@@ -1,1664 +1,576 @@
+require('dotenv').config();
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
-const path = require('path');
-const cors = require('cors');
+const mongoose = require('mongoose');
+const session = require('express-session');
+const MongoDBStore = require('connect-mongodb-session')(session);
 const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const { v4: uuidv4 } = require('uuid');
+const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-const io = socketIo(server, {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST"]
-  }
+const io = socketIo(server);
+
+// الاتصال بقاعدة البيانات
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/syria-chat', {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
 });
 
-// ========== الإعدادات ==========
-app.use(cors());
+// نماذج قاعدة البيانات
+const userSchema = new mongoose.Schema({
+  username: { type: String, unique: true, required: true, minlength: 3, maxlength: 14 },
+  password: { type: String, required: true },
+  gender: { type: String, enum: ['ذكر', 'انثى'], required: true },
+  age: { type: Number, min: 1, max: 99, required: true },
+  role: { 
+    type: String, 
+    enum: ['مالك', 'اونر', 'ادمن', 'عضو مميز', 'عضو', 'ضيف'],
+    default: 'عضو'
+  },
+  serialNumber: { type: Number, unique: true },
+  gold: { type: Number, default: 0 },
+  interactionPoints: { type: Number, default: 0 },
+  profileImage: { type: String, default: '' },
+  profileSong: { type: String, default: '' },
+  profileBackground: { type: String, default: '' },
+  nameColor: { type: String, default: '#000000' },
+  profileFrame: { type: String, default: '' },
+  nameBackground: { type: String, default: '' },
+  country: { type: String, default: '' },
+  joinDate: { type: Date, default: Date.now },
+  isOnline: { type: Boolean, default: false },
+  lastSeen: { type: Date, default: Date.now }
+});
+
+const messageSchema = new mongoose.Schema({
+  senderId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  senderName: String,
+  senderRole: String,
+  content: String,
+  type: { type: String, enum: ['text', 'image', 'audio', 'video', 'youtube'], default: 'text' },
+  mediaUrl: String,
+  isPrivate: { type: Boolean, default: false },
+  receiverId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  room: { type: String, default: 'general' },
+  replyTo: { type: mongoose.Schema.Types.ObjectId, ref: 'Message', default: null },
+  timestamp: { type: Date, default: Date.now },
+  deleted: { type: Boolean, default: false }
+});
+
+const muteSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  mutedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  duration: { type: String, enum: ['5m', '1d', 'permanent'], required: true },
+  reason: String,
+  expiresAt: Date,
+  createdAt: { type: Date, default: Date.now }
+});
+
+const banSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  bannedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  duration: { type: String, enum: ['5m', '1d', 'permanent'], required: true },
+  reason: String,
+  expiresAt: Date,
+  createdAt: { type: Date, default: Date.now }
+});
+
+const User = mongoose.model('User', userSchema);
+const Message = mongoose.model('Message', messageSchema);
+const Mute = mongoose.model('Mute', muteSchema);
+const Ban = mongoose.model('Ban', banSchema);
+
+// تخزين الجلسات
+const store = new MongoDBStore({
+  uri: process.env.MONGODB_URI || 'mongodb://localhost:27017/syria-chat',
+  collection: 'sessions'
+});
+
+// إعدادات الجلسة
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'syria-chat-secret-key',
+  resave: false,
+  saveUninitialized: false,
+  store: store,
+  cookie: { maxAge: 1000 * 60 * 60 * 24 } // 24 ساعة
+}));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-const JWT_SECRET = 'chat-secret-key-2024-change-in-production';
-
-// ========== هياكل البيانات ==========
-const users = new Map();           // جميع المستخدمين
-const onlineUsers = new Map();     // المتصلين الآن
-const rooms = new Map();           // الغرف
-const messages = new Map();        // الرسائل
-const privateMessages = new Map(); // الرسائل الخاصة
-const goldTransactions = new Map(); // معاملات الذهب
-const likes = new Map();           // الإعجابات
-const mutes = new Map();           // المكتمين
-const kicks = new Map();           // المطرودين
-const purchases = new Map();       // عمليات الشراء
-const systemLogs = [];             // سجل الأحداث (للمالك فقط)
-
-// ========== الرتب والصلاحيات ==========
-const ROLES = {
-  OWNER: 'مالك',
-  HONOR: 'اونر',
-  ADMIN: 'ادمن',
-  VIP: 'عضو مميز',
-  MEMBER: 'عضو',
-  GUEST: 'ضيف'
-};
-
-const ROLE_HIERARCHY = {
-  [ROLES.OWNER]: 6,
-  [ROLES.HONOR]: 5,
-  [ROLES.ADMIN]: 4,
-  [ROLES.VIP]: 3,
-  [ROLES.MEMBER]: 2,
-  [ROLES.GUEST]: 1
-};
-
-const ROLE_COLORS = {
-  [ROLES.OWNER]: '#FFD700',     // ذهبي
-  [ROLES.HONOR]: '#FF6B6B',     // أحمر
-  [ROLES.ADMIN]: '#8B5CF6',     // بنفسجي
-  [ROLES.VIP]: '#10B981',       // أخضر
-  [ROLES.MEMBER]: '#3B82F6',    // أزرق
-  [ROLES.GUEST]: '#6B7280'      // رمادي
-};
-
-// ========== تهيئة النظام ==========
-function initializeSystem() {
-  console.log('🚀 جاري تهيئة النظام...');
-  
-  // إنشاء حساب المالك (محمد) - سري بيننا
-  const ownerId = uuidv4();
-  const ownerUsername = 'محمد';
-  const ownerHashedPassword = bcrypt.hashSync('aumsalah079', 10);
-  
-  const ownerUser = {
-    id: ownerId,
-    username: ownerUsername,
-    password: ownerHashedPassword,
-    role: ROLES.OWNER,
-    serial: 1, // الرقم التسلسلي 1 للمالك
-    gender: 'ذكر',
-    age: 25,
-    country: 'السعودية',
-    joinDate: new Date(),
-    gold: 999999, // ذهب غير محدود
-    points: 0,
-    avatar: 'default_owner.png',
-    profileSong: null,
-    nameColor: '#FFD700',
-    profileBg: 'gold_bg.jpg',
-    profileGlow: true,
-    frameAnimation: 'gold_frame.gif',
-    isOnline: false,
-    socketId: null,
-    lastSeen: new Date(),
-    likesReceived: 0,
-    likesGiven: [],
-    goldReceived: 0,
-    goldSent: 0
-  };
-  
-  users.set(ownerUsername.toLowerCase(), ownerUser);
-  console.log(`✅ تم إنشاء حساب المالك: ${ownerUsername}`);
-  
-  // إنشاء غرف افتراضية
-  const defaultRooms = [
-    {
-      id: 'general',
-      name: 'العمومية',
-      description: 'الغرفة الرئيسية للجميع',
-      color: '#3B82F6',
-      messages: [],
-      users: new Set()
-    },
-    {
-      id: 'games',
-      name: 'الألعاب',
-      description: 'مناقشة الألعاب والمنافسات',
-      color: '#10B981',
-      messages: [],
-      users: new Set()
-    },
-    {
-      id: 'friends',
-      name: 'التعارف',
-      description: 'التعارف وبناء الصداقات',
-      color: '#8B5CF6',
-      messages: [],
-      users: new Set()
+// إنشاء حساب المالك الأساسي
+async function createAdminUser() {
+  try {
+    const existingAdmin = await User.findOne({ username: 'محمد' });
+    if (!existingAdmin) {
+      const hashedPassword = await bcrypt.hash('aumsalah079', 10);
+      
+      // حساب المالك
+      const adminUser = new User({
+        username: 'محمد',
+        password: hashedPassword,
+        gender: 'ذكر',
+        age: 25,
+        role: 'مالك',
+        serialNumber: 1,
+        gold: 1000000,
+        interactionPoints: 0,
+        country: 'سوريا'
+      });
+      
+      await adminUser.save();
+      console.log('✅ حساب المالك تم إنشاؤه بنجاح');
     }
-  ];
-  
-  defaultRooms.forEach(room => {
-    rooms.set(room.id, room);
-  });
-  
-  console.log('✅ تم تهيئة النظام بنجاح');
-}
-
-// ========== دوال المساعدة ==========
-function generateToken(user) {
-  return jwt.sign(
-    {
-      id: user.id,
-      username: user.username,
-      role: user.role,
-      serial: user.serial
-    },
-    JWT_SECRET,
-    { expiresIn: '30d' }
-  );
-}
-
-function authenticateToken(req, res, next) {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-  
-  if (!token) return res.status(401).json({ error: 'الوصول مرفوض' });
-  
-  jwt.verify(token, JWT_SECRET, (err, user) => {
-    if (err) return res.status(403).json({ error: 'التوكن غير صالح' });
-    req.user = user;
-    next();
-  });
-}
-
-function canPerformAction(actorRole, targetRole, actionType) {
-  const actorLevel = ROLE_HIERARCHY[actorRole];
-  const targetLevel = ROLE_HIERARCHY[targetRole];
-  
-  if (actionType === 'mute' || actionType === 'kick') {
-    // المالك يقدر على الكل
-    if (actorRole === ROLES.OWNER) return true;
-    
-    // الاونر ما يقدر على المالك
-    if (actorRole === ROLES.HONOR && targetRole === ROLES.OWNER) return false;
-    
-    // الاونر يقدر على الادمن فما دون
-    if (actorRole === ROLES.HONOR && targetLevel <= ROLE_HIERARCHY[ROLES.ADMIN]) return true;
-    
-    // الادمن يقدر على العضو المميز فما دون
-    if (actorRole === ROLES.ADMIN && targetLevel <= ROLE_HIERARCHY[ROLES.VIP]) return true;
-    
-    // العضو المميز والعضو والضيف ما عندهم صلاحية
-    return false;
-  }
-  
-  if (actionType === 'delete_message') {
-    // المالك يقدر يحذف رسائل الكل
-    if (actorRole === ROLES.OWNER) return true;
-    
-    // الاونر يقدر يحذف رسائل الكل ما عدا المالك
-    if (actorRole === ROLES.HONOR && targetRole !== ROLES.OWNER) return true;
-    
-    // الادمن يقدر يحذف رسائل العضو المميز فما دون
-    if (actorRole === ROLES.ADMIN && targetLevel <= ROLE_HIERARCHY[ROLES.VIP]) return true;
-    
-    return false;
-  }
-  
-  return false;
-}
-
-function logSystemEvent(event) {
-  const logEntry = {
-    id: uuidv4(),
-    timestamp: new Date(),
-    ...event
-  };
-  
-  systemLogs.push(logEntry);
-  
-  // الاحتفاظ بآخر 1000 حدث فقط
-  if (systemLogs.length > 1000) {
-    systemLogs.shift();
+  } catch (error) {
+    console.error('❌ خطأ في إنشاء حساب المالك:', error);
   }
 }
 
-function generateSerialNumber() {
-  // نبحث عن آخر رقم تسلسلي
-  let maxSerial = 1;
-  users.forEach(user => {
-    if (user.serial > maxSerial) {
-      maxSerial = user.serial;
-    }
-  });
-  return maxSerial + 1;
-}
+// المسارات
+app.get('/', (req, res) => {
+  if (req.session.userId) {
+    res.redirect('/chat.html');
+  } else {
+    res.redirect('/index.html');
+  }
+});
 
-// ========== API Routes ==========
-
-// 1. تسجيل الدخول للأعضاء
+// تسجيل الدخول
 app.post('/api/login', async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { username, password, remember } = req.body;
     
-    if (!username || !password) {
-      return res.status(400).json({ error: 'اسم المستخدم وكلمة المرور مطلوبان' });
-    }
-    
-    const userKey = username.toLowerCase();
-    const user = users.get(userKey);
-    
+    const user = await User.findOne({ username });
     if (!user) {
-      return res.status(401).json({ error: 'اسم المستخدم غير موجود' });
-    }
-    
-    // حساب المالك - دخول مباشر بالسري
-    if (username === 'محمد' && password === 'aumsalah079') {
-      const token = generateToken(user);
-      
-      return res.json({
-        success: true,
-        token,
-        user: {
-          id: user.id,
-          username: user.username,
-          role: user.role,
-          serial: user.serial,
-          gender: user.gender,
-          age: user.age,
-          country: user.country,
-          gold: user.gold,
-          points: user.points,
-          avatar: user.avatar,
-          nameColor: user.nameColor,
-          profileBg: user.profileBg,
-          profileGlow: user.profileGlow,
-          frameAnimation: user.frameAnimation,
-          joinDate: user.joinDate
-        }
-      });
+      return res.status(401).json({ success: false, message: 'اسم المستخدم أو كلمة المرور غير صحيحة' });
     }
     
     const validPassword = await bcrypt.compare(password, user.password);
     if (!validPassword) {
-      return res.status(401).json({ error: 'كلمة المرور غير صحيحة' });
+      return res.status(401).json({ success: false, message: 'اسم المستخدم أو كلمة المرور غير صحيحة' });
     }
     
-    user.lastSeen = new Date();
-    users.set(userKey, user);
+    req.session.userId = user._id;
+    req.session.username = user.username;
+    req.session.role = user.role;
     
-    const token = generateToken(user);
+    if (remember) {
+      req.session.cookie.maxAge = 1000 * 60 * 60 * 24 * 30; // 30 يوم
+    }
     
-    res.json({
-      success: true,
-      token,
+    res.json({ 
+      success: true, 
       user: {
-        id: user.id,
+        id: user._id,
         username: user.username,
         role: user.role,
-        serial: user.serial,
-        gender: user.gender,
-        age: user.age,
-        country: user.country,
-        gold: user.gold,
-        points: user.points,
-        avatar: user.avatar,
-        nameColor: user.nameColor,
-        profileBg: user.profileBg,
-        profileGlow: user.profileGlow,
-        frameAnimation: user.frameAnimation,
-        joinDate: user.joinDate
+        serialNumber: user.serialNumber,
+        gold: user.gold
       }
     });
-    
   } catch (error) {
-    console.error('❌ خطأ في تسجيل الدخول:', error);
-    res.status(500).json({ error: 'خطأ في السيرفر' });
+    res.status(500).json({ success: false, message: 'حدث خطأ في الخادم' });
   }
 });
 
-// 2. إنشاء حساب جديد
+// تسجيل حساب جديد
 app.post('/api/register', async (req, res) => {
   try {
-    const { username, password, gender, age } = req.body;
+    const { username, password, confirmPassword, gender, age } = req.body;
     
     // التحقق من البيانات
-    if (!username || !password || !gender || !age) {
-      return res.status(400).json({ error: 'جميع الحقول مطلوبة' });
+    if (password !== confirmPassword) {
+      return res.status(400).json({ success: false, message: 'كلمة المرور غير متطابقة' });
     }
     
     if (username.length < 3 || username.length > 14) {
-      return res.status(400).json({ error: 'اسم المستخدم يجب أن يكون بين 3 و 14 حرف' });
+      return res.status(400).json({ success: false, message: 'اسم المستخدم يجب أن يكون بين 3 و 14 حرف' });
     }
     
     if (password.length < 3 || password.length > 14) {
-      return res.status(400).json({ error: 'كلمة المرور يجب أن تكون بين 3 و 14 حرف' });
+      return res.status(400).json({ success: false, message: 'كلمة المرور يجب أن تكون بين 3 و 14 حرف' });
     }
     
-    if (age < 1 || age > 99) {
-      return res.status(400).json({ error: 'العمر يجب أن يكون بين 1 و 99' });
+    // التحقق من عدم تكرار اسم المستخدم
+    const existingUser = await User.findOne({ username });
+    if (existingUser) {
+      return res.status(400).json({ success: false, message: 'اسم المستخدم موجود مسبقاً' });
     }
     
-    if (!['ذكر', 'أنثى'].includes(gender)) {
-      return res.status(400).json({ error: 'الجنس غير صالح' });
-    }
+    // إنشاء رقم تسلسلي جديد
+    const lastUser = await User.findOne().sort({ serialNumber: -1 });
+    const newSerialNumber = lastUser ? lastUser.serialNumber + 1 : 2;
     
-    const userKey = username.toLowerCase();
-    
-    // التحقق من عدم تكرار الاسم
-    if (users.has(userKey)) {
-      return res.status(400).json({ error: 'اسم المستخدم محجوز' });
-    }
-    
-    // كلمة المرور لا تساوي اسم المستخدم
-    if (password.toLowerCase() === username.toLowerCase()) {
-      return res.status(400).json({ error: 'كلمة المرور لا يجب أن تكون مثل اسم المستخدم' });
-    }
-    
+    // تشفير كلمة المرور
     const hashedPassword = await bcrypt.hash(password, 10);
-    const userId = uuidv4();
-    const serial = generateSerialNumber();
     
-    const newUser = {
-      id: userId,
-      username: username.trim(),
+    // إنشاء المستخدم الجديد
+    const newUser = new User({
+      username,
       password: hashedPassword,
-      role: ROLES.MEMBER, // العضوية الأساسية
-      serial,
       gender,
-      age: parseInt(age),
-      country: 'غير محدد',
-      joinDate: new Date(),
-      gold: 0, // يبدأ بصفر ذهب
-      points: 0,
-      avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=3B82F6&color=fff`,
-      profileSong: null,
-      nameColor: '#000000',
-      profileBg: null,
-      profileGlow: false,
-      frameAnimation: null,
-      isOnline: false,
-      socketId: null,
-      lastSeen: new Date(),
-      likesReceived: 0,
-      likesGiven: [],
-      goldReceived: 0,
-      goldSent: 0
-    };
-    
-    users.set(userKey, newUser);
-    
-    // تسجيل الحدث
-    logSystemEvent({
-      type: 'REGISTER',
-      actor: 'النظام',
-      target: username,
-      details: 'إنشاء حساب جديد'
+      age,
+      serialNumber: newSerialNumber
     });
     
-    const token = generateToken(newUser);
+    await newUser.save();
     
-    res.json({
-      success: true,
-      token,
-      user: {
-        id: newUser.id,
-        username: newUser.username,
-        role: newUser.role,
-        serial: newUser.serial,
-        gender: newUser.gender,
-        age: newUser.age,
-        country: newUser.country,
-        gold: newUser.gold,
-        points: newUser.points,
-        avatar: newUser.avatar,
-        nameColor: newUser.nameColor,
-        profileBg: newUser.profileBg,
-        profileGlow: newUser.profileGlow,
-        frameAnimation: newUser.frameAnimation,
-        joinDate: newUser.joinDate
-      }
+    res.json({ 
+      success: true, 
+      message: 'تم إنشاء الحساب بنجاح',
+      serialNumber: newSerialNumber
     });
-    
   } catch (error) {
-    console.error('❌ خطأ في إنشاء الحساب:', error);
-    res.status(500).json({ error: 'خطأ في السيرفر' });
+    res.status(500).json({ success: false, message: 'حدث خطأ في الخادم' });
   }
 });
 
-// 3. تسجيل زائر
-app.post('/api/register-guest', async (req, res) => {
+// تسجيل الدخول كزائر
+app.post('/api/guest', async (req, res) => {
   try {
     const { username, gender, age } = req.body;
     
-    // التحقق من البيانات
-    if (!username || !gender || !age) {
-      return res.status(400).json({ error: 'جميع الحقول مطلوبة' });
-    }
-    
     if (username.length < 3 || username.length > 14) {
-      return res.status(400).json({ error: 'اسم المستخدم يجب أن يكون بين 3 و 14 حرف' });
+      return res.status(400).json({ success: false, message: 'الاسم يجب أن يكون بين 3 و 14 حرف' });
     }
-    
-    if (age < 1 || age > 99) {
-      return res.status(400).json({ error: 'العمر يجب أن يكون بين 1 و 99' });
-    }
-    
-    if (!['ذكر', 'أنثى'].includes(gender)) {
-      return res.status(400).json({ error: 'الجنس غير صالح' });
-    }
-    
-    const userKey = username.toLowerCase();
     
     // التحقق من عدم تكرار الاسم
-    if (users.has(userKey)) {
-      return res.status(400).json({ error: 'اسم المستخدم محجوز' });
+    const existingUser = await User.findOne({ username, role: 'ضيف' });
+    if (existingUser) {
+      return res.status(400).json({ success: false, message: 'الاسم موجود مسبقاً' });
     }
     
-    const userId = uuidv4();
-    const serial = generateSerialNumber();
+    // إنشاء رقم تسلسلي جديد للزائر
+    const lastUser = await User.findOne().sort({ serialNumber: -1 });
+    const newSerialNumber = lastUser ? lastUser.serialNumber + 1 : 2;
     
-    const guestUser = {
-      id: userId,
-      username: username.trim(),
-      password: null, // الزائر ما عنده كلمة سر
-      role: ROLES.GUEST,
-      serial,
+    // إنشاء حساب زائر
+    const guestUser = new User({
+      username,
+      password: 'guest', // كلمة مرور افتراضية
       gender,
-      age: parseInt(age),
-      country: 'غير محدد',
-      joinDate: new Date(),
-      gold: 0,
-      points: 0,
-      avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=6B7280&color=fff`,
-      profileSong: null,
-      nameColor: '#6B7280',
-      profileBg: null,
-      profileGlow: false,
-      frameAnimation: null,
-      isOnline: false,
-      socketId: null,
-      lastSeen: new Date(),
-      likesReceived: 0,
-      likesGiven: [],
-      goldReceived: 0,
-      goldSent: 0
-    };
+      age,
+      role: 'ضيف',
+      serialNumber: newSerialNumber
+    });
     
-    users.set(userKey, guestUser);
+    await guestUser.save();
     
-    const token = generateToken(guestUser);
+    req.session.userId = guestUser._id;
+    req.session.username = guestUser.username;
+    req.session.role = guestUser.role;
+    req.session.isGuest = true;
     
-    res.json({
+    res.json({ 
       success: true,
-      token,
       user: {
-        id: guestUser.id,
+        id: guestUser._id,
         username: guestUser.username,
         role: guestUser.role,
-        serial: guestUser.serial,
-        gender: guestUser.gender,
-        age: guestUser.age,
-        country: guestUser.country,
-        gold: guestUser.gold,
-        points: guestUser.points,
-        avatar: guestUser.avatar,
-        nameColor: guestUser.nameColor,
-        profileBg: guestUser.profileBg,
-        profileGlow: guestUser.profileGlow,
-        frameAnimation: guestUser.frameAnimation,
-        joinDate: guestUser.joinDate
+        serialNumber: newSerialNumber
       }
     });
-    
   } catch (error) {
-    console.error('❌ خطأ في تسجيل الزائر:', error);
-    res.status(500).json({ error: 'خطأ في السيرفر' });
+    res.status(500).json({ success: false, message: 'حدث خطأ في الخادم' });
   }
 });
 
-// 4. التحقق من اسم المستخدم
-app.post('/api/check-username', (req, res) => {
-  try {
-    const { username } = req.body;
-    
-    if (!username) {
-      return res.status(400).json({ error: 'اسم المستخدم مطلوب' });
-    }
-    
-    const userKey = username.toLowerCase();
-    const exists = users.has(userKey);
-    
-    res.json({
-      available: !exists,
-      message: exists ? 'اسم المستخدم محجوز' : 'اسم المستخدم متاح'
-    });
-    
-  } catch (error) {
-    console.error('❌ خطأ في التحقق:', error);
-    res.status(500).json({ error: 'خطأ في السيرفر' });
-  }
+// الخروج
+app.post('/api/logout', (req, res) => {
+  req.session.destroy();
+  res.json({ success: true });
 });
 
-// 5. الحصول على معلومات المستخدم
-app.get('/api/user/:username', authenticateToken, (req, res) => {
-  try {
-    const { username } = req.params;
-    const userKey = username.toLowerCase();
-    const user = users.get(userKey);
-    
-    if (!user) {
-      return res.status(404).json({ error: 'المستخدم غير موجود' });
-    }
-    
-    // إخفاء المعلومات الحساسة
-    const publicUser = {
-      id: user.id,
-      username: user.username,
-      role: user.role,
-      serial: user.serial,
-      gender: user.gender,
-      age: user.age,
-      country: user.country,
-      gold: user.gold,
-      points: user.points,
-      avatar: user.avatar,
-      nameColor: user.nameColor,
-      profileBg: user.profileBg,
-      profileGlow: user.profileGlow,
-      frameAnimation: user.frameAnimation,
-      joinDate: user.joinDate,
-      likesReceived: user.likesReceived,
-      goldReceived: user.goldReceived,
-      isOnline: user.isOnline,
-      lastSeen: user.lastSeen
-    };
-    
-    res.json({ user: publicUser });
-    
-  } catch (error) {
-    console.error('❌ خطأ في جلب معلومات المستخدم:', error);
-    res.status(500).json({ error: 'خطأ في السيرفر' });
-  }
-});
-
-// 6. تعديل البروفايل
-app.post('/api/update-profile', authenticateToken, (req, res) => {
-  try {
-    const { nameColor, profileBg, profileGlow, frameAnimation, country } = req.body;
-    const username = req.user.username.toLowerCase();
-    const user = users.get(username);
-    
-    if (!user) {
-      return res.status(404).json({ error: 'المستخدم غير موجود' });
-    }
-    
-    // التحقق من الصلاحيات للتعديلات المتقدمة
-    if (nameColor && ![ROLES.VIP, ROLES.ADMIN, ROLES.HONOR, ROLES.OWNER].includes(user.role)) {
-      return res.status(403).json({ error: 'لا تملك صلاحية لتلوين الاسم' });
-    }
-    
-    if (profileBg && ![ROLES.VIP, ROLES.ADMIN, ROLES.HONOR, ROLES.OWNER].includes(user.role)) {
-      return res.status(403).json({ error: 'لا تملك صلاحية لوضع خلفية للبروفايل' });
-    }
-    
-    if (profileGlow && ![ROLES.VIP, ROLES.ADMIN, ROLES.HONOR, ROLES.OWNER].includes(user.role)) {
-      return res.status(403).json({ error: 'لا تملك صلاحية للتوهج' });
-    }
-    
-    if (frameAnimation && ![ROLES.ADMIN, ROLES.HONOR, ROLES.OWNER].includes(user.role)) {
-      return res.status(403).json({ error: 'لا تملك صلاحية لإطار الصورة المتحرك' });
-    }
-    
-    // التحديثات المسموحة للجميع
-    if (country) user.country = country;
-    
-    // التحديثات المشروطة بالرتبة
-    if (nameColor && [ROLES.VIP, ROLES.ADMIN, ROLES.HONOR, ROLES.OWNER].includes(user.role)) {
-      user.nameColor = nameColor;
-    }
-    
-    if (profileBg && [ROLES.VIP, ROLES.ADMIN, ROLES.HONOR, ROLES.OWNER].includes(user.role)) {
-      user.profileBg = profileBg;
-    }
-    
-    if (profileGlow && [ROLES.VIP, ROLES.ADMIN, ROLES.HONOR, ROLES.OWNER].includes(user.role)) {
-      user.profileGlow = profileGlow;
-    }
-    
-    if (frameAnimation && [ROLES.ADMIN, ROLES.HONOR, ROLES.OWNER].includes(user.role)) {
-      user.frameAnimation = frameAnimation;
-    }
-    
-    users.set(username, user);
-    
-    // توليد توكن جديد بالمعلومات المحدثة
-    const token = generateToken(user);
-    
-    res.json({
-      success: true,
-      token,
-      user: {
-        id: user.id,
-        username: user.username,
-        role: user.role,
-        serial: user.serial,
-        gender: user.gender,
-        age: user.age,
-        country: user.country,
-        gold: user.gold,
-        points: user.points,
-        avatar: user.avatar,
-        nameColor: user.nameColor,
-        profileBg: user.profileBg,
-        profileGlow: user.profileGlow,
-        frameAnimation: user.frameAnimation,
-        joinDate: user.joinDate
-      }
-    });
-    
-  } catch (error) {
-    console.error('❌ خطأ في تحديث البروفايل:', error);
-    res.status(500).json({ error: 'خطأ في السيرفر' });
-  }
-});
-
-// 7. إعطاء لايك
-app.post('/api/like', authenticateToken, (req, res) => {
-  try {
-    const { targetUsername } = req.body;
-    const likerUsername = req.user.username.toLowerCase();
-    const liker = users.get(likerUsername);
-    
-    if (!liker) {
-      return res.status(404).json({ error: 'المستخدم غير موجود' });
-    }
-    
-    const targetKey = targetUsername.toLowerCase();
-    const targetUser = users.get(targetKey);
-    
-    if (!targetUser) {
-      return res.status(404).json({ error: 'المستخدم المستهدف غير موجود' });
-    }
-    
-    if (likerUsername === targetKey) {
-      return res.status(400).json({ error: 'لا يمكنك إعطاء لايك لنفسك' });
-    }
-    
-    // التحقق إذا أعطى لايك من قبل
-    if (liker.likesGiven.includes(targetUser.username)) {
-      return res.status(400).json({ error: 'لقد أعطيت لايك لهذا المستخدم من قبل' });
-    }
-    
-    // تحديث الإعجابات
-    targetUser.likesReceived += 1;
-    liker.likesGiven.push(targetUser.username);
-    
-    users.set(targetKey, targetUser);
-    users.set(likerUsername, liker);
-    
-    // إرسال إشعار للمستخدم
-    if (targetUser.socketId) {
-      io.to(targetUser.socketId).emit('notification', {
-        type: 'LIKE',
-        from: liker.username,
-        message: 'أعطاك إعجاباً'
-      });
-    }
-    
-    res.json({
-      success: true,
-      message: 'تم إعطاء الإعجاب بنجاح',
-      likesCount: targetUser.likesReceived
-    });
-    
-  } catch (error) {
-    console.error('❌ خطأ في إعطاء لايك:', error);
-    res.status(500).json({ error: 'خطأ في السيرفر' });
-  }
-});
-
-// 8. إرسال ذهب (للمالك فقط)
-app.post('/api/send-gold', authenticateToken, (req, res) => {
-  try {
-    const { targetUsername, amount } = req.body;
-    const senderUsername = req.user.username.toLowerCase();
-    const sender = users.get(senderUsername);
-    
-    if (!sender) {
-      return res.status(404).json({ error: 'المستخدم غير موجود' });
-    }
-    
-    // التحقق من الصلاحية (المالك فقط)
-    if (sender.role !== ROLES.OWNER) {
-      return res.status(403).json({ error: 'لا تملك صلاحية إرسال الذهب' });
-    }
-    
-    const targetKey = targetUsername.toLowerCase();
-    const targetUser = users.get(targetKey);
-    
-    if (!targetUser) {
-      return res.status(404).json({ error: 'المستخدم المستهدف غير موجود' });
-    }
-    
-    if (senderUsername === targetKey) {
-      return res.status(400).json({ error: 'لا يمكنك إرسال ذهب لنفسك' });
-    }
-    
-    const goldAmount = parseInt(amount);
-    if (isNaN(goldAmount) || goldAmount <= 0) {
-      return res.status(400).json({ error: 'المبلغ غير صالح' });
-    }
-    
-    // المالك عنده ذهب غير محدود
-    // إرسال الذهب للمستخدم المستهدف
-    targetUser.gold += goldAmount;
-    targetUser.goldReceived += goldAmount;
-    sender.goldSent += goldAmount;
-    
-    users.set(targetKey, targetUser);
-    users.set(senderUsername, sender);
-    
-    // تسجيل المعاملة
-    const transactionId = uuidv4();
-    const transaction = {
-      id: transactionId,
-      sender: sender.username,
-      receiver: targetUser.username,
-      amount: goldAmount,
-      timestamp: new Date(),
-      type: 'GOLD_TRANSFER'
-    };
-    
-    goldTransactions.set(transactionId, transaction);
-    
-    // تسجيل الحدث في سجل النظام
-    logSystemEvent({
-      type: 'GOLD_SENT',
-      actor: sender.username,
-      target: targetUser.username,
-      details: `إرسال ${goldAmount} ذهب`,
-      amount: goldAmount
-    });
-    
-    // إرسال إشعار للمستخدم
-    if (targetUser.socketId) {
-      io.to(targetUser.socketId).emit('notification', {
-        type: 'GOLD',
-        from: sender.username,
-        amount: goldAmount,
-        message: `أرسل لك ${goldAmount} ذهب`
-      });
-    }
-    
-    // تحديث قائمة الأثرياء للجميع
-    updateRichList();
-    
-    res.json({
-      success: true,
-      message: `تم إرسال ${goldAmount} ذهب إلى ${targetUser.username}`,
-      newBalance: targetUser.gold
-    });
-    
-  } catch (error) {
-    console.error('❌ خطأ في إرسال الذهب:', error);
-    res.status(500).json({ error: 'خطأ في السيرفر' });
-  }
-});
-
-// 9. شراء رتبة
-app.post('/api/buy-role', authenticateToken, (req, res) => {
-  try {
-    const { targetRole } = req.body;
-    const buyerUsername = req.user.username.toLowerCase();
-    const buyer = users.get(buyerUsername);
-    
-    if (!buyer) {
-      return res.status(404).json({ error: 'المستخدم غير موجود' });
-    }
-    
-    // التحقق من الرتبة المطلوبة
-    const rolePrices = {
-      [ROLES.VIP]: 5000,
-      [ROLES.ADMIN]: 20000
-    };
-    
-    if (!rolePrices.hasOwnProperty(targetRole)) {
-      return res.status(400).json({ error: 'الرتبة غير متاحة للشراء' });
-    }
-    
-    const price = rolePrices[targetRole];
-    
-    // التحقق من الرصيد
-    if (buyer.gold < price) {
-      return res.status(400).json({ error: `رصيدك غير كافي. السعر: ${price} ذهب` });
-    }
-    
-    // التحقق من الرتبة الحالية
-    const currentLevel = ROLE_HIERARCHY[buyer.role];
-    const targetLevel = ROLE_HIERARCHY[targetRole];
-    
-    if (targetLevel <= currentLevel) {
-      return res.status(400).json({ error: 'لا يمكنك شراء رتبة أقل أو مساوية لرتبتك الحالية' });
-    }
-    
-    // خصم الذهب
-    buyer.gold -= price;
-    buyer.role = targetRole;
-    
-    // إذا كان شراء رتبة ادمن، إضافة إطار متحرك
-    if (targetRole === ROLES.ADMIN) {
-      buyer.frameAnimation = 'admin_frame.gif';
-    }
-    
-    // إذا كان شراء رتبة عضو مميز، إضافة خلفية وتوهج
-    if (targetRole === ROLES.VIP) {
-      buyer.profileBg = 'vip_bg.jpg';
-      buyer.profileGlow = true;
-    }
-    
-    users.set(buyerUsername, buyer);
-    
-    // تسجيل عملية الشراء
-    const purchaseId = uuidv4();
-    const purchase = {
-      id: purchaseId,
-      buyer: buyer.username,
-      role: targetRole,
-      price: price,
-      timestamp: new Date()
-    };
-    
-    purchases.set(purchaseId, purchase);
-    
-    // تسجيل الحدث
-    logSystemEvent({
-      type: 'ROLE_PURCHASE',
-      actor: buyer.username,
-      target: targetRole,
-      details: `شراء رتبة ${targetRole} مقابل ${price} ذهب`,
-      amount: price
-    });
-    
-    // توليد توكن جديد
-    const token = generateToken(buyer);
-    
-    // إرسال إشعار للجميع
-    io.emit('roleUpdate', {
-      username: buyer.username,
-      newRole: targetRole,
-      message: `${buyer.username} اشترى رتبة ${targetRole}`
-    });
-    
-    res.json({
-      success: true,
-      token,
-      message: `تم شراء رتبة ${targetRole} بنجاح`,
-      newRole: buyer.role,
-      newGold: buyer.gold,
-      user: {
-        id: buyer.id,
-        username: buyer.username,
-        role: buyer.role,
-        serial: buyer.serial,
-        gold: buyer.gold,
-        points: buyer.points,
-        nameColor: buyer.nameColor,
-        profileBg: buyer.profileBg,
-        profileGlow: buyer.profileGlow,
-        frameAnimation: buyer.frameAnimation
-      }
-    });
-    
-  } catch (error) {
-    console.error('❌ خطأ في شراء الرتبة:', error);
-    res.status(500).json({ error: 'خطأ في السيرفر' });
-  }
-});
-
-// 10. إهداء رتبة (للأونر والمالك فقط)
-app.post('/api/gift-role', authenticateToken, (req, res) => {
-  try {
-    const { targetUsername, targetRole } = req.body;
-    const gifterUsername = req.user.username.toLowerCase();
-    const gifter = users.get(gifterUsername);
-    
-    if (!gifter) {
-      return res.status(404).json({ error: 'المستخدم غير موجود' });
-    }
-    
-    // التحقق من الصلاحية (الاونر والمالك فقط)
-    if (![ROLES.HONOR, ROLES.OWNER].includes(gifter.role)) {
-      return res.status(403).json({ error: 'لا تملك صلاحية إهداء الرتب' });
-    }
-    
-    const targetKey = targetUsername.toLowerCase();
-    const targetUser = users.get(targetKey);
-    
-    if (!targetUser) {
-      return res.status(404).json({ error: 'المستخدم المستهدف غير موجود' });
-    }
-    
-    // التحقق من الرتبة المهداة
-    const allowedGifts = {
-      [ROLES.HONOR]: [ROLES.VIP, ROLES.ADMIN],
-      [ROLES.OWNER]: [ROLES.VIP, ROLES.ADMIN, ROLES.HONOR]
-    };
-    
-    if (!allowedGifts[gifter.role]?.includes(targetRole)) {
-      return res.status(400).json({ error: 'لا يمكنك إهداء هذه الرتبة' });
-    }
-    
-    // التحقق من التسلسل الهرمي
-    if (ROLE_HIERARCHY[targetRole] <= ROLE_HIERARCHY[targetUser.role]) {
-      return res.status(400).json({ error: 'لا يمكن إهداء رتبة أقل أو مساوية لرتبته الحالية' });
-    }
-    
-    // تحديث رتبة المستهدف
-    const oldRole = targetUser.role;
-    targetUser.role = targetRole;
-    
-    // إضافة المميزات حسب الرتبة
-    if (targetRole === ROLES.ADMIN) {
-      targetUser.frameAnimation = 'admin_frame.gif';
-    } else if (targetRole === ROLES.VIP) {
-      targetUser.profileBg = 'vip_bg.jpg';
-      targetUser.profileGlow = true;
-    }
-    
-    users.set(targetKey, targetUser);
-    
-    // تسجيل الحدث
-    logSystemEvent({
-      type: 'ROLE_GIFT',
-      actor: gifter.username,
-      target: targetUser.username,
-      details: `إهداء رتبة ${targetRole}`,
-      oldRole: oldRole,
-      newRole: targetRole
-    });
-    
-    // إرسال إشعار للمستخدم
-    if (targetUser.socketId) {
-      io.to(targetUser.socketId).emit('notification', {
-        type: 'ROLE_GIFT',
-        from: gifter.username,
-        role: targetRole,
-        message: `حصلت على رتبة ${targetRole} هدية من ${gifter.username}`
-      });
-    }
-    
-    // إعلام الجميع
-    io.emit('roleUpdate', {
-      username: targetUser.username,
-      newRole: targetRole,
-      message: `${gifter.username} أهدى رتبة ${targetRole} لـ ${targetUser.username}`
-    });
-    
-    res.json({
-      success: true,
-      message: `تم إهداء رتبة ${targetRole} لـ ${targetUser.username}`
-    });
-    
-  } catch (error) {
-    console.error('❌ خطأ في إهداء الرتبة:', error);
-    res.status(500).json({ error: 'خطأ في السيرفر' });
-  }
-});
-
-// 11. كتم مستخدم
-app.post('/api/mute', authenticateToken, (req, res) => {
-  try {
-    const { targetUsername, duration } = req.body;
-    const muterUsername = req.user.username.toLowerCase();
-    const muter = users.get(muterUsername);
-    
-    if (!muter) {
-      return res.status(404).json({ error: 'المستخدم غير موجود' });
-    }
-    
-    const targetKey = targetUsername.toLowerCase();
-    const targetUser = users.get(targetKey);
-    
-    if (!targetUser) {
-      return res.status(404).json({ error: 'المستخدم المستهدف غير موجود' });
-    }
-    
-    // التحقق من الصلاحية
-    if (!canPerformAction(muter.role, targetUser.role, 'mute')) {
-      return res.status(403).json({ error: 'لا تملك صلاحية كتم هذا المستخدم' });
-    }
-    
-    const durationOptions = {
-      '5m': 5 * 60 * 1000,        // 5 دقائق
-      '1d': 24 * 60 * 60 * 1000,  // يوم
-      'forever': null             // للأبد
-    };
-    
-    if (!durationOptions.hasOwnProperty(duration)) {
-      return res.status(400).json({ error: 'المدة غير صالحة' });
-    }
-    
-    const muteId = uuidv4();
-    const muteExpiry = duration === 'forever' ? null : new Date(Date.now() + durationOptions[duration]);
-    
-    const muteRecord = {
-      id: muteId,
-      muter: muter.username,
-      target: targetUser.username,
-      duration: duration,
-      expiry: muteExpiry,
-      timestamp: new Date()
-    };
-    
-    mutes.set(muteId, muteRecord);
-    
-    // تسجيل الحدث
-    logSystemEvent({
-      type: 'MUTE',
-      actor: muter.username,
-      target: targetUser.username,
-      details: `كتم لمدة ${duration}`,
-      duration: duration
-    });
-    
-    // إرسال إشعار للمستخدم المكتم
-    if (targetUser.socketId) {
-      io.to(targetUser.socketId).emit('muted', {
-        muter: muter.username,
-        duration: duration,
-        expiry: muteExpiry,
-        message: `تم كتمك من قبل ${muter.username} لمدة ${duration}`
-      });
-    }
-    
-    // إعلام الغرفة
-    const room = rooms.get('general');
-    if (room) {
-      const systemMessage = {
-        id: uuidv4(),
-        type: 'system',
-        content: `قام ${muter.username} بكتم ${targetUser.username} لمدة ${duration}`,
-        timestamp: new Date(),
-        roomId: 'general'
-      };
-      
-      room.messages.push(systemMessage);
-      io.to('general').emit('newMessage', systemMessage);
-    }
-    
-    res.json({
-      success: true,
-      message: `تم كتم ${targetUser.username} لمدة ${duration}`,
-      expiry: muteExpiry
-    });
-    
-  } catch (error) {
-    console.error('❌ خطأ في كتم المستخدم:', error);
-    res.status(500).json({ error: 'خطأ في السيرفر' });
-  }
-});
-
-// 12. طرد مستخدم
-app.post('/api/kick', authenticateToken, (req, res) => {
-  try {
-    const { targetUsername, duration } = req.body;
-    const kickerUsername = req.user.username.toLowerCase();
-    const kicker = users.get(kickerUsername);
-    
-    if (!kicker) {
-      return res.status(404).json({ error: 'المستخدم غير موجود' });
-    }
-    
-    const targetKey = targetUsername.toLowerCase();
-    const targetUser = users.get(targetKey);
-    
-    if (!targetUser) {
-      return res.status(404).json({ error: 'المستخدم المستهدف غير موجود' });
-    }
-    
-    // التحقق من الصلاحية
-    if (!canPerformAction(kicker.role, targetUser.role, 'kick')) {
-      return res.status(403).json({ error: 'لا تملك صلاحية طرد هذا المستخدم' });
-    }
-    
-    const durationOptions = {
-      '5m': 5 * 60 * 1000,        // 5 دقائق
-      '1d': 24 * 60 * 60 * 1000,  // يوم
-      'forever': null             // للأبد
-    };
-    
-    if (!durationOptions.hasOwnProperty(duration)) {
-      return res.status(400).json({ error: 'المدة غير صالحة' });
-    }
-    
-    const kickId = uuidv4();
-    const kickExpiry = duration === 'forever' ? null : new Date(Date.now() + durationOptions[duration]);
-    
-    const kickRecord = {
-      id: kickId,
-      kicker: kicker.username,
-      target: targetUser.username,
-      duration: duration,
-      expiry: kickExpiry,
-      timestamp: new Date()
-    };
-    
-    kicks.set(kickId, kickRecord);
-    
-    // تسجيل الحدث
-    logSystemEvent({
-      type: 'KICK',
-      actor: kicker.username,
-      target: targetUser.username,
-      details: `طرد لمدة ${duration}`,
-      duration: duration
-    });
-    
-    // إرسال إشعار للمستخدم المطرود
-    if (targetUser.socketId) {
-      io.to(targetUser.socketId).emit('kicked', {
-        kicker: kicker.username,
-        duration: duration,
-        expiry: kickExpiry,
-        message: `تم طردك من قبل ${kicker.username} لمدة ${duration}`
-      });
-    }
-    
-    // إعلام الغرفة
-    const room = rooms.get('general');
-    if (room) {
-      const systemMessage = {
-        id: uuidv4(),
-        type: 'system',
-        content: `قام ${kicker.username} بطرد ${targetUser.username} لمدة ${duration}`,
-        timestamp: new Date(),
-        roomId: 'general'
-      };
-      
-      room.messages.push(systemMessage);
-      io.to('general').emit('newMessage', systemMessage);
-    }
-    
-    res.json({
-      success: true,
-      message: `تم طرد ${targetUser.username} لمدة ${duration}`,
-      expiry: kickExpiry
-    });
-    
-  } catch (error) {
-    console.error('❌ خطأ في طرد المستخدم:', error);
-    res.status(500).json({ error: 'خطأ في السيرفر' });
-  }
-});
-
-// 13. الحصول على القوائم
-app.get('/api/lists', authenticateToken, (req, res) => {
-  try {
-    // قائمة الأثرياء (أكثر 3 ذهب)
-    const richList = Array.from(users.values())
-      .filter(user => user.gold > 0)
-      .sort((a, b) => b.gold - a.gold)
-      .slice(0, 3)
-      .map(user => ({
-        username: user.username,
-        role: user.role,
-        gold: user.gold,
-        avatar: user.avatar,
-        nameColor: user.nameColor
-      }));
-    
-    // قائمة المتفاعلين (أكثر 3 نقاط)
-    const activeList = Array.from(users.values())
-      .filter(user => user.points > 0)
-      .sort((a, b) => b.points - a.points)
-      .slice(0, 3)
-      .map(user => ({
-        username: user.username,
-        role: user.role,
-        points: user.points,
-        avatar: user.avatar,
-        nameColor: user.nameColor
-      }));
-    
-    // قائمة المتصلين
-    const onlineList = Array.from(users.values())
-      .filter(user => user.isOnline)
-      .sort((a, b) => ROLE_HIERARCHY[b.role] - ROLE_HIERARCHY[a.role])
-      .map(user => ({
-        username: user.username,
-        role: user.role,
-        avatar: user.avatar,
-        nameColor: user.nameColor,
-        serial: user.serial,
-        points: user.points,
-        gold: user.gold
-      }));
-    
-    res.json({
-      success: true,
-      richList,
-      activeList,
-      onlineList
-    });
-    
-  } catch (error) {
-    console.error('❌ خطأ في جلب القوائم:', error);
-    res.status(500).json({ error: 'خطأ في السيرفر' });
-  }
-});
-
-// 14. سجل الأحداث (للمالك فقط)
-app.get('/api/system-logs', authenticateToken, (req, res) => {
-  try {
-    const username = req.user.username.toLowerCase();
-    const user = users.get(username);
-    
-    if (!user) {
-      return res.status(404).json({ error: 'المستخدم غير موجود' });
-    }
-    
-    // التحقق من الصلاحية (المالك فقط)
-    if (user.role !== ROLES.OWNER) {
-      return res.status(403).json({ error: 'لا تملك صلاحية الوصول لسجل الأحداث' });
-    }
-    
-    res.json({
-      success: true,
-      logs: systemLogs.slice(-100).reverse() // آخر 100 حدث
-    });
-    
-  } catch (error) {
-    console.error('❌ خطأ في جلب سجل الأحداث:', error);
-    res.status(500).json({ error: 'خطأ في السيرفر' });
-  }
-});
-
-// 15. حذف رسالة
-app.post('/api/delete-message', authenticateToken, (req, res) => {
-  try {
-    const { messageId, roomId } = req.body;
-    const deleterUsername = req.user.username.toLowerCase();
-    const deleter = users.get(deleterUsername);
-    
-    if (!deleter) {
-      return res.status(404).json({ error: 'المستخدم غير موجود' });
-    }
-    
-    const room = rooms.get(roomId);
-    if (!room) {
-      return res.status(404).json({ error: 'الغرفة غير موجودة' });
-    }
-    
-    // البحث عن الرسالة
-    const messageIndex = room.messages.findIndex(msg => msg.id === messageId);
-    if (messageIndex === -1) {
-      return res.status(404).json({ error: 'الرسالة غير موجودة' });
-    }
-    
-    const message = room.messages[messageIndex];
-    const senderKey = message.sender.toLowerCase();
-    const sender = users.get(senderKey);
-    
-    // التحقق من الصلاحية
-    if (!canPerformAction(deleter.role, sender?.role || ROLES.GUEST, 'delete_message')) {
-      return res.status(403).json({ error: 'لا تملك صلاحية حذف هذه الرسالة' });
-    }
-    
-    // حذف الرسالة
-    room.messages.splice(messageIndex, 1);
-    
-    // تسجيل الحدث
-    logSystemEvent({
-      type: 'DELETE_MESSAGE',
-      actor: deleter.username,
-      target: message.sender,
-      details: `حذف رسالة في ${roomId}`,
-      messageId: messageId
-    });
-    
-    // إعلام الغرفة
-    io.to(roomId).emit('messageDeleted', {
-      messageId,
-      roomId,
-      deletedBy: deleter.username
-    });
-    
-    res.json({
-      success: true,
-      message: 'تم حذف الرسالة بنجاح'
-    });
-    
-  } catch (error) {
-    console.error('❌ خطأ في حذف الرسالة:', error);
-    res.status(500).json({ error: 'خطأ في السيرفر' });
-  }
-});
-
-// 16. تحديث قائمة الأثرياء
-function updateRichList() {
-  const richList = Array.from(users.values())
-    .filter(user => user.gold > 0)
-    .sort((a, b) => b.gold - a.gold)
-    .slice(0, 3);
-  
-  io.emit('richListUpdate', richList);
-}
-
-// ========== Socket.IO Handling ==========
+// Socket.io events
 io.on('connection', (socket) => {
-  console.log('🔗 مستخدم جديد متصل:', socket.id);
+  console.log('🔗 مستخدم متصل:', socket.id);
   
-  // الانضمام لغرفة
-  socket.on('joinRoom', async ({ token, roomId }) => {
+  socket.on('join-chat', async (userData) => {
     try {
-      const decoded = jwt.verify(token, JWT_SECRET);
-      const username = decoded.username.toLowerCase();
-      const user = users.get(username);
-      
-      if (!user) {
-        socket.emit('error', { message: 'المستخدم غير موجود' });
-        return;
-      }
-      
-      // التحقق من الطرد
-      const isKicked = Array.from(kicks.values()).some(kick => 
-        kick.target === user.username && 
-        (kick.duration === 'forever' || (kick.expiry && new Date(kick.expiry) > new Date()))
-      );
-      
-      if (isKicked) {
-        socket.emit('kicked', { message: 'أنت مطرود حالياً ولا يمكنك الدخول' });
-        return;
-      }
-      
-      // تحديث حالة الاتصال
-      user.isOnline = true;
-      user.socketId = socket.id;
-      user.lastSeen = new Date();
-      users.set(username, user);
-      onlineUsers.set(socket.id, user);
-      
-      socket.user = user;
-      socket.join(roomId);
-      socket.currentRoom = roomId;
-      
-      const room = rooms.get(roomId);
-      if (room) {
-        room.users.add(user.username);
+      const user = await User.findById(userData.id);
+      if (user) {
+        user.isOnline = true;
+        await user.save();
+        
+        socket.join('general');
+        socket.userId = user._id;
+        socket.username = user.username;
+        socket.role = user.role;
         
         // إرسال رسالة دخول
-        const joinMessage = {
-          id: uuidv4(),
-          type: 'system',
-          content: `${user.username} انضم للغرفة`,
-          timestamp: new Date(),
-          roomId: roomId
+        const welcomeMessage = {
+          senderId: user._id,
+          senderName: user.username,
+          senderRole: user.role,
+          content: `🎉 ${user.username} إنضم للغرفة`,
+          type: 'system'
         };
         
-        room.messages.push(joinMessage);
-        
-        // إرسال تأثير دخول حسب الرتبة
-        const joinEffects = {
-          [ROLES.OWNER]: { type: 'gold', message: 'المالك دخل الغرفة! 👑' },
-          [ROLES.HONOR]: { type: 'fire', message: 'الاونر دخل الغرفة! 🔥' },
-          [ROLES.ADMIN]: { type: 'sparkle', message: 'الادمن دخل الغرفة! ✨' },
-          [ROLES.VIP]: { type: 'vip', message: 'العضو المميز دخل الغرفة! ⭐' },
-          [ROLES.MEMBER]: { type: 'normal', message: '' },
-          [ROLES.GUEST]: { type: 'normal', message: '' }
-        };
-        
-        const effect = joinEffects[user.role];
-        if (effect.message) {
-          io.to(roomId).emit('joinEffect', {
-            username: user.username,
-            effect: effect.type,
-            message: effect.message
-          });
-        }
+        io.to('general').emit('new-message', welcomeMessage);
         
         // تحديث قائمة المستخدمين
-        const roomUsers = Array.from(room.users).map(u => {
-          const userObj = users.get(u.toLowerCase());
-          return userObj ? {
-            username: userObj.username,
-            role: userObj.role,
-            serial: userObj.serial,
-            isOnline: userObj.isOnline,
-            avatar: userObj.avatar,
-            nameColor: userObj.nameColor,
-            points: userObj.points,
-            gold: userObj.gold
-          } : null;
-        }).filter(Boolean);
+        const onlineUsers = await User.find({ isOnline: true });
+        const allUsers = await User.find().sort({ role: -1, gold: -1 }).limit(50);
         
-        // إرسال البيانات للمستخدم
-        socket.emit('roomJoined', {
-          room: {
-            id: room.id,
-            name: room.name,
-            description: room.description,
-            color: room.color
-          },
-          users: roomUsers.sort((a, b) => ROLE_HIERARCHY[b.role] - ROLE_HIERARCHY[a.role]),
-          messages: room.messages.slice(-100)
-        });
-        
-        // تحديث القوائم للجميع
-        io.emit('onlineUsersUpdate', {
-          roomId,
-          users: roomUsers
+        io.emit('update-users', {
+          online: onlineUsers,
+          all: allUsers
         });
       }
-      
     } catch (error) {
-      console.error('❌ خطأ في الانضمام للغرفة:', error);
-      socket.emit('error', { message: 'خطأ في المصادقة' });
+      console.error('خطأ في الانضمام:', error);
     }
   });
   
-  // إرسال رسالة
-  socket.on('sendMessage', ({ token, roomId, content, replyTo }) => {
+  socket.on('send-message', async (messageData) => {
     try {
-      const decoded = jwt.verify(token, JWT_SECRET);
-      const username = decoded.username.toLowerCase();
-      const user = users.get(username);
-      
-      if (!user) {
-        socket.emit('error', { message: 'المستخدم غير موجود' });
-        return;
-      }
-      
       // التحقق من الكتم
-      const isMuted = Array.from(mutes.values()).some(mute => 
-        mute.target === user.username && 
-        (mute.duration === 'forever' || (mute.expiry && new Date(mute.expiry) > new Date()))
-      );
+      const isMuted = await Mute.findOne({ 
+        userId: messageData.senderId,
+        expiresAt: { $gt: new Date() }
+      });
       
       if (isMuted) {
-        socket.emit('muted', { message: 'أنت مكتم حالياً ولا يمكنك الكتابة' });
+        socket.emit('muted', { 
+          duration: isMuted.duration,
+          expiresAt: isMuted.expiresAt 
+        });
         return;
       }
-      
-      const room = rooms.get(roomId);
-      if (!room) {
-        socket.emit('error', { message: 'الغرفة غير موجودة' });
-        return;
-      }
-      
-      const messageId = uuidv4();
-      const newMessage = {
-        id: messageId,
-        type: 'text',
-        content,
-        sender: user.username,
-        senderRole: user.role,
-        senderSerial: user.serial,
-        senderColor: user.nameColor,
-        senderAvatar: user.avatar,
-        replyTo: replyTo,
-        timestamp: new Date(),
-        roomId,
-        pointsAwarded: true
-      };
-      
-      // زيادة نقاط التفاعل
-      user.points += 1;
-      users.set(username, user);
-      
-      room.messages.push(newMessage);
-      
-      // إرسال الرسالة للجميع
-      io.to(roomId).emit('newMessage', newMessage);
-      
-      // تحديث قائمة المتفاعلين
-      updateActiveList();
-      
-    } catch (error) {
-      console.error('❌ خطأ في إرسال الرسالة:', error);
-      socket.emit('error', { message: 'خطأ في إرسال الرسالة' });
-    }
-  });
-  
-  // إرسال رسالة خاصة
-  socket.on('sendPrivateMessage', ({ token, receiver, content }) => {
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET);
-      const senderUsername = decoded.username.toLowerCase();
-      const sender = users.get(senderUsername);
-      
-      if (!sender) {
-        socket.emit('error', { message: 'المستخدم غير موجود' });
-        return;
-      }
-      
-      const receiverKey = receiver.toLowerCase();
-      const receiverUser = users.get(receiverKey);
-      
-      if (!receiverUser) {
-        socket.emit('error', { message: 'المستخدم المستقبل غير موجود' });
-        return;
-      }
-      
-      const messageId = uuidv4();
-      const privateMessage = {
-        id: messageId,
-        type: 'private',
-        content,
-        sender: sender.username,
-        senderRole: sender.role,
-        senderColor: sender.nameColor,
-        senderAvatar: sender.avatar,
-        receiver: receiverUser.username,
-        timestamp: new Date(),
-        read: false,
-        pointsAwarded: true
-      };
-      
-      // زيادة نقاط التفاعل
-      sender.points += 1;
-      users.set(senderUsername, sender);
       
       // حفظ الرسالة
-      const chatKey = [sender.username, receiverUser.username].sort().join(':');
-      if (!privateMessages.has(chatKey)) {
-        privateMessages.set(chatKey, []);
+      const newMessage = new Message({
+        senderId: messageData.senderId,
+        senderName: messageData.senderName,
+        senderRole: messageData.senderRole,
+        content: messageData.content,
+        type: messageData.type,
+        mediaUrl: messageData.mediaUrl,
+        isPrivate: messageData.isPrivate,
+        receiverId: messageData.receiverId,
+        replyTo: messageData.replyTo
+      });
+      
+      await newMessage.save();
+      
+      // زيادة نقاط التفاعل للمرسل
+      await User.findByIdAndUpdate(messageData.senderId, {
+        $inc: { interactionPoints: 1 }
+      });
+      
+      // إرسال الرسالة
+      if (messageData.isPrivate) {
+        io.to(messageData.receiverId).emit('private-message', newMessage);
+        socket.emit('private-message-sent', newMessage);
+      } else {
+        io.to('general').emit('new-message', newMessage);
       }
-      privateMessages.get(chatKey).push(privateMessage);
       
-      // إرسال الرسالة للمستقبل إذا كان متصلاً
-      if (receiverUser.socketId) {
-        io.to(receiverUser.socketId).emit('newPrivateMessage', privateMessage);
-        
-        // إشعار
-        io.to(receiverUser.socketId).emit('notification', {
-          type: 'PRIVATE_MESSAGE',
-          from: sender.username,
-          message: 'رسالة خاصة جديدة'
-        });
-      }
+      // تحديث قائمة أكثر المتفاعلين
+      const topInteractors = await User.find()
+        .sort({ interactionPoints: -1 })
+        .limit(3);
       
-      // تأكيد للمرسل
-      socket.emit('privateMessageSent', privateMessage);
-      
-      // تحديث قائمة المتفاعلين
-      updateActiveList();
-      
+      io.emit('update-top-interactors', topInteractors);
     } catch (error) {
-      console.error('❌ خطأ في إرسال الرسالة الخاصة:', error);
-      socket.emit('error', { message: 'خطأ في إرسال الرسالة الخاصة' });
+      console.error('خطأ في إرسال الرسالة:', error);
     }
   });
   
-  // تحديث قائمة المتفاعلين
-  function updateActiveList() {
-    const activeList = Array.from(users.values())
-      .filter(user => user.points > 0)
-      .sort((a, b) => b.points - a.points)
-      .slice(0, 3);
-    
-    io.emit('activeListUpdate', activeList);
-  }
+  socket.on('mute-user', async (data) => {
+    try {
+      const muter = await User.findById(data.muterId);
+      const target = await User.findById(data.targetId);
+      
+      // التحقق من الصلاحيات
+      if (!canMute(muter.role, target.role)) {
+        socket.emit('error', { message: 'لا تملك الصلاحية لكتم هذا المستخدم' });
+        return;
+      }
+      
+      // حساب وقت انتهاء الكتم
+      let expiresAt = new Date();
+      switch(data.duration) {
+        case '5m':
+          expiresAt.setMinutes(expiresAt.getMinutes() + 5);
+          break;
+        case '1d':
+          expiresAt.setDate(expiresAt.getDate() + 1);
+          break;
+        case 'permanent':
+          expiresAt.setFullYear(expiresAt.getFullYear() + 100); // 100 سنة
+          break;
+      }
+      
+      const mute = new Mute({
+        userId: data.targetId,
+        mutedBy: data.muterId,
+        duration: data.duration,
+        reason: data.reason,
+        expiresAt: expiresAt
+      });
+      
+      await mute.save();
+      
+      // إرسال إشعار
+      io.to(data.targetId).emit('muted-notification', {
+        duration: data.duration,
+        reason: data.reason,
+        mutedBy: muter.username
+      });
+      
+      // تسجيل الإجراء
+      const actionMessage = {
+        senderId: data.muterId,
+        senderName: muter.username,
+        senderRole: muter.role,
+        content: `🔇 قام ${muter.username} بكتم ${target.username} لمدة ${data.duration}`,
+        type: 'action'
+      };
+      
+      io.to('general').emit('new-message', actionMessage);
+    } catch (error) {
+      console.error('خطأ في كتم المستخدم:', error);
+    }
+  });
   
-  // قطع الاتصال
-  socket.on('disconnect', () => {
-    const user = onlineUsers.get(socket.id);
-    
-    if (user) {
-      console.log('🔌 مستخدم انقطع:', user.username);
+  socket.on('send-gold', async (data) => {
+    try {
+      const sender = await User.findById(data.senderId);
+      const receiver = await User.findById(data.receiverId);
       
-      user.isOnline = false;
-      user.socketId = null;
-      user.lastSeen = new Date();
-      users.set(user.username.toLowerCase(), user);
-      onlineUsers.delete(socket.id);
+      // التحقق من أن المرسل هو المالك فقط
+      if (sender.role !== 'مالك') {
+        socket.emit('error', { message: 'فقط المالك يمكنه إرسال الذهب' });
+        return;
+      }
       
-      // تحديث جميع الغرف
-      rooms.forEach(room => {
-        if (room.users.has(user.username)) {
-          room.users.delete(user.username);
-          
-          // رسالة خروج
-          const leaveMessage = {
-            id: uuidv4(),
-            type: 'system',
-            content: `${user.username} غادر الغرفة`,
-            timestamp: new Date(),
-            roomId: room.id
-          };
-          
-          room.messages.push(leaveMessage);
-          io.to(room.id).emit('newMessage', leaveMessage);
+      // التحقق من الرصيد
+      if (sender.gold < data.amount) {
+        socket.emit('error', { message: 'رصيدك غير كافي' });
+        return;
+      }
+      
+      // تحويل الذهب
+      sender.gold -= data.amount;
+      receiver.gold += data.amount;
+      
+      await sender.save();
+      await receiver.save();
+      
+      // إرسال إشعار للمستقبل
+      io.to(data.receiverId).emit('gold-received', {
+        amount: data.amount,
+        from: sender.username
+      });
+      
+      // تحديث قائمة الأثرياء
+      const richest = await User.find()
+        .sort({ gold: -1 })
+        .limit(3);
+      
+      io.emit('update-richest', richest);
+    } catch (error) {
+      console.error('خطأ في إرسال الذهب:', error);
+    }
+  });
+  
+  socket.on('buy-role', async (data) => {
+    try {
+      const user = await User.findById(data.userId);
+      
+      let rolePrice = 0;
+      let targetRole = '';
+      
+      switch(data.role) {
+        case 'ادمن':
+          rolePrice = 20000;
+          targetRole = 'ادمن';
+          break;
+        case 'عضو مميز':
+          rolePrice = 5000;
+          targetRole = 'عضو مميز';
+          break;
+      }
+      
+      if (user.gold < rolePrice) {
+        socket.emit('error', { message: 'رصيدك غير كافي لشراء هذه الرتبة' });
+        return;
+      }
+      
+      user.gold -= rolePrice;
+      user.role = targetRole;
+      await user.save();
+      
+      socket.emit('role-purchased', {
+        role: targetRole,
+        newGold: user.gold
+      });
+      
+      // إشعار للجميع
+      io.to('general').emit('new-message', {
+        senderId: user._id,
+        senderName: 'النظام',
+        senderRole: 'system',
+        content: `🎖️ قام ${user.username} بشراء رتبة ${targetRole}`,
+        type: 'system'
+      });
+    } catch (error) {
+      console.error('خطأ في شراء الرتبة:', error);
+    }
+  });
+  
+  socket.on('disconnect', async () => {
+    try {
+      if (socket.userId) {
+        const user = await User.findById(socket.userId);
+        if (user) {
+          user.isOnline = false;
+          user.lastSeen = new Date();
+          await user.save();
           
           // تحديث قائمة المستخدمين
-          const roomUsers = Array.from(room.users).map(u => {
-            const userObj = users.get(u.toLowerCase());
-            return userObj ? {
-              username: userObj.username,
-              role: userObj.role,
-              isOnline: userObj.isOnline,
-              avatar: userObj.avatar
-            } : null;
-          }).filter(Boolean);
+          const onlineUsers = await User.find({ isOnline: true });
+          const allUsers = await User.find().sort({ role: -1, gold: -1 }).limit(50);
           
-          io.to(room.id).emit('onlineUsersUpdate', {
-            roomId: room.id,
-            users: roomUsers
+          io.emit('update-users', {
+            online: onlineUsers,
+            all: allUsers
           });
         }
-      });
-      
-      // تحديث القوائم
-      io.emit('userOffline', {
-        username: user.username,
-        role: user.role
-      });
+      }
+    } catch (error) {
+      console.error('خطأ في قطع الاتصال:', error);
     }
   });
 });
 
-// ========== تشغيل السيرفر ==========
-initializeSystem();
+// دالة للتحقق من صلاحية الكتم
+function canMute(muterRole, targetRole) {
+  const roleHierarchy = {
+    'مالك': 6,
+    'اونر': 5,
+    'ادمن': 4,
+    'عضو مميز': 3,
+    'عضو': 2,
+    'ضيف': 1
+  };
+  
+  // المالك لا يمكن كتمه
+  if (targetRole === 'مالك') return false;
+  
+  // الأونر لا يمكن كتم المالك
+  if (muterRole === 'اونر' && targetRole === 'مالك') return false;
+  
+  // يمكن الكتم إذا كان المرتبة أعلى
+  return roleHierarchy[muterRole] > roleHierarchy[targetRole];
+}
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`🚀 السيرفر يعمل على المنفذ ${PORT}`);
-  console.log(`🌐 افتح http://localhost:${PORT} في المتصفح`);
-  console.log(`🔑 حساب المالك: محمد - كلمة السر: aumsalah079`);
-  console.log(`🔒 هذا السري بيننا فقط`);
+server.listen(PORT, async () => {
+  console.log(`🚀 الخادم يعمل على المنفذ ${PORT}`);
+  await createAdminUser();
 });
