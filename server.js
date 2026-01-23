@@ -200,56 +200,93 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-// ==================== تسجيل حساب جديد ====================
-app.post('/api/register', async (req, res) => {
+// ==================== تسجيل الدخول ====================
+app.post('/api/login', async (req, res) => {
+    console.log('📩 طلب دخول وصل:', req.body);
+    
     try {
-        const { username, password, gender } = req.body;
+        const { username, password } = req.body;
         
-        if (!username || !password || !gender) {
-            return res.json({ 
-                success: false, 
-                error: 'جميع الحقول مطلوبة' 
-            });
-        }
+        console.log('📝 البيانات:', { username, password: '****' });
         
+        // خاص لحساب محمد - تحقق مباشر
         if (username === 'محمد') {
+            console.log('🔑 تحقق من حساب محمد');
+            
+            if (password === 'aumsalah079') {
+                console.log('✅ كلمة السر صحيحة لمحمد');
+                
+                // البحث عن محمد في قاعدة البيانات
+                let user = await User.findOne({ username: 'محمد' });
+                
+                // إذا ما لقيناه، ننشئه
+                if (!user) {
+                    console.log('🆕 محمد غير موجود، جاري إنشائه...');
+                    const hashedPassword = await bcrypt.hash('aumsalah079', 10);
+                    user = new User({
+                        serialNumber: 1,
+                        username: 'محمد',
+                        password: hashedPassword,
+                        gender: 'male',
+                        role: 'owner'
+                    });
+                    await user.save();
+                    console.log('✅ تم إنشاء حساب محمد');
+                }
+                
+                console.log('✅ تم تسجيل دخول محمد:', user._id);
+                
+                return res.json({
+                    success: true,
+                    userId: user._id,
+                    username: user.username,
+                    role: user.role,
+                    gender: user.gender
+                });
+                
+            } else {
+                console.log('❌ كلمة السر خاطئة لمحمد');
+                return res.json({ 
+                    success: false, 
+                    error: 'كلمة المرور غير صحيحة' 
+                });
+            }
+        }
+        
+        // باقي المستخدمين
+        console.log('🔍 البحث عن مستخدم:', username);
+        const user = await User.findOne({ username });
+        
+        if (!user) {
+            console.log('❌ المستخدم غير موجود:', username);
             return res.json({ 
                 success: false, 
-                error: 'هذا الاسم محجوز' 
+                error: 'اسم المستخدم غير موجود' 
             });
         }
         
-        const existingUser = await User.findOne({ username });
-        if (existingUser) {
+        console.log('🔐 التحقق من كلمة السر');
+        const validPassword = await bcrypt.compare(password, user.password);
+        
+        if (!validPassword) {
+            console.log('❌ كلمة السر خاطئة');
             return res.json({ 
                 success: false, 
-                error: 'اسم المستخدم موجود بالفعل' 
+                error: 'كلمة المرور غير صحيحة' 
             });
         }
         
-        const lastUser = await User.findOne().sort({ serialNumber: -1 });
-        const serialNumber = lastUser ? lastUser.serialNumber + 1 : 2;
-        
-        const hashedPassword = await bcrypt.hash(password, 10);
-        
-        const newUser = new User({
-            serialNumber,
-            username,
-            password: hashedPassword,
-            gender,
-            role: 'member'
-        });
-        
-        await newUser.save();
-        
-        res.json({ 
-            success: true, 
-            message: 'تم إنشاء الحساب بنجاح',
-            userId: newUser._id 
+        console.log('✅ تم تسجيل دخول:', username);
+        res.json({
+            success: true,
+            userId: user._id,
+            username: user.username,
+            role: user.role,
+            gender: user.gender
         });
         
     } catch (error) {
-        console.error('Register error:', error);
+        console.error('🔥 خطأ في الدخول:', error);
         res.json({ 
             success: false, 
             error: 'حدث خطأ في الخادم' 
