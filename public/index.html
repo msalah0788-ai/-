@@ -3,153 +3,168 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>شات متقدم - الرئيسية</title>
+    <title>شات متقدم - دخول</title>
     <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
-    <div class="main-container">
-        <!-- الشاشة الرئيسية -->
-        <div id="startScreen" class="screen active">
-            <div class="welcome-card">
-                <div class="logo">
-                    <i class="fas fa-comments"></i>
-                    <h1>شات متقدم</h1>
-                </div>
-                
-                <p style="text-align: center; color: #666; margin-bottom: 30px;">
-                    اختر طريقة الدخول المناسبة لك
-                </p>
-                
-                <div class="options-container">
-                    <!-- دخول الأعضاء -->
-                    <div class="option-card">
-                        <div class="option-icon">
-                            <i class="fas fa-sign-in-alt"></i>
-                        </div>
-                        <h3>دخول الأعضاء</h3>
-                        <p>الدخول بحسابك المسجل</p>
-                        <button class="option-btn" onclick="showLogin(); return false;">
-                            دخول <i class="fas fa-arrow-left"></i>
-                        </button>
-                    </div>
-                    
-                    <!-- تسجيل جديد -->
-                    <div class="option-card">
-                        <div class="option-icon">
-                            <i class="fas fa-user-plus"></i>
-                        </div>
-                        <h3>تسجيل حساب جديد</h3>
-                        <p>انضم إلينا وتمتع بالمزايا</p>
-                       <button class="option-btn" onclick="showRegister(); return false;">
-                            تسجيل <i class="fas fa-arrow-left"></i>
-                        </button>
-                    </div>
-                    
-                    <!-- دخول كضيف -->
-                    <div class="option-card">
-                        <div class="option-icon">
-                            <i class="fas fa-user-clock"></i>
-                        </div>
-                        <h3>الدخول كضيف</h3>
-                        <p>دردشة بدون تسجيل (محدود)</p>
-                       <button class="option-btn" onclick="showGuestLogin(); return false;">
-                            دخول كضيف <i class="fas fa-arrow-left"></i>
-                        </button>
-                    </div>
-                </div>
-                
-                <div style="margin-top: 30px; text-align: center; color: #777; font-size: 14px;">
-                    <p><i class="fas fa-crown"></i> مالك الموقع: محمد</p>
-                </div>
-            </div>
+    <div class="login-container">
+        <div class="login-header">
+            <h1><i class="fas fa-comments"></i> شات متقدم</h1>
+            <p>مكان للتواصل والتفاعل مع الأصدقاء</p>
         </div>
-        
-              <!-- ========== شاشة تسجيل الدخول ========== -->
-        <div id="loginScreen" class="screen" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; display:flex; align-items:center; justify-content:center;">
-            <div style="background:white; padding:40px; border-radius:20px; width:90%; max-width:400px; text-align:center; box-shadow:0 10px 40px rgba(0,0,0,0.3);">
-                <h2 style="color:#4361ee; margin-bottom:25px; font-size:26px;">
-                    <i class="fas fa-sign-in-alt"></i> تسجيل الدخول
-                </h2>
-                <input type="text" placeholder="اسم المستخدم" style="width:100%; padding:14px; margin:12px 0; border:2px solid #ddd; border-radius:10px; font-size:16px;"><br>
-                <input type="password" placeholder="كلمة السر" style="width:100%; padding:14px; margin:12px 0; border:2px solid #ddd; border-radius:10px; font-size:16px;"><br>
-                <div style="margin-top:25px;">
-                    <button onclick="alert('تم الدخول بنجاح!')" style="background:linear-gradient(135deg,#4361ee,#3a0ca3); color:white; border:none; padding:14px 30px; border-radius:10px; margin:8px; cursor:pointer; font-size:16px; font-weight:bold;">
-                        <i class="fas fa-sign-in-alt"></i> دخول
-                    </button>
-                    <button onclick="showStartScreen()" style="background:#6c757d; color:white; border:none; padding:14px 30px; border-radius:10px; margin:8px; cursor:pointer; font-size:16px;">
-                        <i class="fas fa-arrow-right"></i> رجوع
-                    </button>
+
+        <div class="login-options">
+            <div class="option-card member" onclick="openModal('login-modal')">
+                <div class="option-icon">
+                    <i class="fas fa-sign-in-alt"></i>
                 </div>
+                <h3>دخول الأعضاء</h3>
+                <p>الدخول بحسابك المسجل للاستمتاع بجميع الميزات</p>
+                <button class="option-btn" onclick="openModal('login-modal')">
+                    <i class="fas fa-arrow-left"></i> دخول
+                </button>
+            </div>
+
+            <div class="option-card register" onclick="openModal('register-modal')">
+                <div class="option-icon">
+                    <i class="fas fa-user-plus"></i>
+                </div>
+                <h3>تسجيل حساب جديد</h3>
+                <p>انضم إلينا الآن واحصل على رتبة عضو مميز</p>
+                <button class="option-btn" onclick="openModal('register-modal')">
+                    <i class="fas fa-user-check"></i> تسجيل
+                </button>
+            </div>
+
+            <div class="option-card guest" onclick="openModal('guest-modal')">
+                <div class="option-icon">
+                    <i class="fas fa-user-clock"></i>
+                </div>
+                <h3>الدخول كضيف</h3>
+                <p>ادخل كزائر للاطلاع مع بعض القيود</p>
+                <button class="option-btn" onclick="openModal('guest-modal')">
+                    <i class="fas fa-door-open"></i> دخول سريع
+                </button>
             </div>
         </div>
 
-        <!-- ========== شاشة التسجيل الجديد ========== -->
-        <div id="registerScreen" class="screen" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; display:flex; align-items:center; justify-content:center;">
-            <div style="background:white; padding:40px; border-radius:20px; width:90%; max-width:400px; text-align:center; box-shadow:0 10px 40px rgba(0,0,0,0.3);">
-                <h2 style="color:#4361ee; margin-bottom:25px; font-size:26px;">
-                    <i class="fas fa-user-plus"></i> تسجيل حساب جديد
-                </h2>
-                <input type="text" placeholder="اسم المستخدم الجديد" style="width:100%; padding:14px; margin:12px 0; border:2px solid #ddd; border-radius:10px; font-size:16px;"><br>
-                <input type="password" placeholder="كلمة السر" style="width:100%; padding:14px; margin:12px 0; border:2px solid #ddd; border-radius:10px; font-size:16px;"><br>
-                <input type="password" placeholder="تأكيد كلمة السر" style="width:100%; padding:14px; margin:12px 0; border:2px solid #ddd; border-radius:10px; font-size:16px;"><br>
-                <div style="margin:15px 0;">
-                    <label style="display:block; text-align:right; margin-bottom:8px; font-weight:bold;">الجنس</label>
-                    <select style="width:100%; padding:14px; border:2px solid #ddd; border-radius:10px; font-size:16px;">
-                        <option value="male">👤 ذكر</option>
-                        <option value="female">👩 أنثى</option>
-                    </select>
-                </div>
-                <div style="margin-top:25px;">
-                    <button onclick="alert('تم إنشاء الحساب بنجاح!')" style="background:linear-gradient(135deg,#4361ee,#3a0ca3); color:white; border:none; padding:14px 30px; border-radius:10px; margin:8px; cursor:pointer; font-size:16px; font-weight:bold;">
-                        <i class="fas fa-user-plus"></i> تسجيل
-                    </button>
-                    <button onclick="showStartScreen()" style="background:#6c757d; color:white; border:none; padding:14px 30px; border-radius:10px; margin:8px; cursor:pointer; font-size:16px;">
-                        <i class="fas fa-arrow-right"></i> رجوع
-                    </button>
-                </div>
-            </div>
+        <div class="watermark">
+            © 2024 شات متقدم - جميع الحقوق محفوظة
         </div>
+    </div>
 
-        <!-- ========== شاشة الدخول كضيف ========== -->
-        <div id="guestScreen" class="screen" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; display:flex; align-items:center; justify-content:center;">
-            <div style="background:white; padding:40px; border-radius:20px; width:90%; max-width:400px; text-align:center; box-shadow:0 10px 40px rgba(0,0,0,0.3);">
-                <h2 style="color:#4361ee; margin-bottom:25px; font-size:26px;">
-                    <i class="fas fa-user-clock"></i> الدخول كضيف
-                </h2>
-                <input type="text" placeholder="اختر اسمك المؤقت" style="width:100%; padding:14px; margin:12px 0; border:2px solid #ddd; border-radius:10px; font-size:16px;"><br>
-                <div style="margin:15px 0;">
-                    <label style="display:block; text-align:right; margin-bottom:8px; font-weight:bold;">الجنس</label>
-                    <div style="display:flex; gap:15px; justify-content:center;">
-                        <label style="display:flex; align-items:center; cursor:pointer;">
-                            <input type="radio" name="guestGender" value="male" style="margin-left:8px;">
-                            <span>👤 ذكر</span>
-                        </label>
-                        <label style="display:flex; align-items:center; cursor:pointer;">
-                            <input type="radio" name="guestGender" value="female" style="margin-left:8px;">
-                            <span>👩 أنثى</span>
-                        </label>
-                    </div>
+    <!-- نافذة دخول الأعضاء -->
+    <div class="modal" id="login-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-sign-in-alt"></i> دخول الأعضاء</h2>
+                <button class="close-modal" onclick="closeModal('login-modal')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="error-message" id="error-message"></div>
+                <div class="form-group">
+                    <label for="login-username"><i class="fas fa-user"></i> اسم المستخدم</label>
+                    <input type="text" id="login-username" class="form-control" placeholder="أدخل اسم المستخدم">
                 </div>
-                <div style="background:#f8f9fa; padding:15px; border-radius:10px; margin:20px 0; text-align:right;">
-                    <p style="margin:5px 0; color:#666; font-size:14px;">
-                        <i class="fas fa-info-circle"></i> ملاحظة: دخول مؤقت
-                    </p>
+                <div class="form-group">
+                    <label for="login-password"><i class="fas fa-lock"></i> كلمة السر</label>
+                    <input type="password" id="login-password" class="form-control" placeholder="أدخل كلمة السر">
                 </div>
-                <div style="margin-top:25px;">
-                    <button onclick="alert('مرحباً ضيف!')" style="background:linear-gradient(135deg,#4361ee,#3a0ca3); color:white; border:none; padding:14px 30px; border-radius:10px; margin:8px; cursor:pointer; font-size:16px; font-weight:bold;">
-                        <i class="fas fa-door-open"></i> دخول كضيف
-                    </button>
-                    <button onclick="showStartScreen()" style="background:#6c757d; color:white; border:none; padding:14px 30px; border-radius:10px; margin:8px; cursor:pointer; font-size:16px;">
-                        <i class="fas fa-arrow-right"></i> رجوع
-                    </button>
-                </div>
+                <button class="submit-btn" onclick="login()">
+                    <i class="fas fa-sign-in-alt"></i> دخول إلى الشات
+                </button>
             </div>
         </div>
     </div>
 
-    <!-- منطقة الإشعارات -->
-    <div id="notificationArea"></div>
+    <!-- نافذة التسجيل -->
+    <div class="modal" id="register-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-user-plus"></i> تسجيل حساب جديد</h2>
+                <button class="close-modal" onclick="closeModal('register-modal')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="error-message" id="error-message"></div>
+                <div class="form-group">
+                    <label for="register-username"><i class="fas fa-user"></i> اسم المستخدم</label>
+                    <input type="text" id="register-username" class="form-control" placeholder="اختر اسم مستخدم فريد">
+                </div>
+                <div class="form-group">
+                    <label for="register-password"><i class="fas fa-lock"></i> كلمة السر</label>
+                    <input type="password" id="register-password" class="form-control" placeholder="كلمة السر (4 أحرف على الأقل)">
+                </div>
+                <div class="form-group">
+                    <label for="register-confirm-password"><i class="fas fa-lock"></i> تأكيد كلمة السر</label>
+                    <input type="password" id="register-confirm-password" class="form-control" placeholder="أعد إدخال كلمة السر">
+                </div>
+                <div class="form-group">
+                    <label><i class="fas fa-venus-mars"></i> الجنس</label>
+                    <div class="gender-options">
+                        <button class="gender-btn male active" onclick="selectGender('ذكر')">
+                            <i class="fas fa-mars"></i> ذكر
+                        </button>
+                        <button class="gender-btn female" onclick="selectGender('أنثى')">
+                            <i class="fas fa-venus"></i> أنثى
+                        </button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="register-age"><i class="fas fa-birthday-cake"></i> العمر</label>
+                    <input type="number" id="register-age" class="form-control" placeholder="أدخل عمرك" min="13" max="100">
+                </div>
+                <button class="submit-btn" onclick="register()">
+                    <i class="fas fa-user-check"></i> إنشاء الحساب
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- نافذة الدخول كضيف -->
+    <div class="modal" id="guest-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-user-clock"></i> الدخول كضيف</h2>
+                <button class="close-modal" onclick="closeModal('guest-modal')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="guest-username"><i class="fas fa-user"></i> اسم المستخدم</label>
+                    <input type="text" id="guest-username" class="form-control" placeholder="أدخل اسمًا للظهور">
+                </div>
+                <div class="form-group">
+                    <label><i class="fas fa-venus-mars"></i> الجنس</label>
+                    <div class="gender-options">
+                        <button class="gender-btn male active" onclick="selectGender('ذكر')">
+                            <i class="fas fa-mars"></i> ذكر
+                        </button>
+                        <button class="gender-btn female" onclick="selectGender('أنثى')">
+                            <i class="fas fa-venus"></i> أنثى
+                        </button>
+                    </div>
+                </div>
+                <div class="guest-info">
+                    <p><i class="fas fa-info-circle"></i> كمستخدم ضيف، يمكنك:</p>
+                    <ul style="text-align: right; padding-right: 20px; color: #666;">
+                        <li>المشاركة في المحادثات العامة</li>
+                        <li>رؤية جميع المستخدمين</li>
+                        <li>تغيير اسمك وصورتك فقط</li>
+                        <li>لا يمكنك الترقية أو الظهور في قائمة الأكثر تفاعلاً</li>
+                    </ul>
+                </div>
+                <button class="submit-btn" onclick="enterAsGuest()">
+                    <i class="fas fa-door-open"></i> دخول كضيف
+                </button>
+            </div>
+        </div>
+    </div>
 
     <script src="script.js"></script>
 </body>
