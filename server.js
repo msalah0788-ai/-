@@ -2,226 +2,178 @@ const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
 const server = http.createServer(app);
+const io = socketIo(server);
 
-// إعداد Socket.io مع تحسينات
-const io = socketIo(server, {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST"]
-  },
-  pingTimeout: 60000, // زيادة وقت المهلة
-  pingInterval: 25000
-});
+// بيانات التطبيق
+const users = {};
+const messages = { general: [] };
+const rooms = ['general'];
+const friendships = {};
+const userDataFile = 'users.json';
 
-// خدمة الملفات الثابتة
+// تحميل بيانات المستخدمين من ملف
+let userData = {};
+if (fs.existsSync(userDataFile)) {
+    userData = JSON.parse(fs.readFileSync(userDataFile, 'utf8'));
+}
+
+// حفظ بيانات المستخدمين
+function saveUserData() {
+    fs.writeFileSync(userDataFile, JSON.stringify(userData, null, 2));
+}
+
+// تعريف رتب المالك
+userData['mohammad'] = {
+    password: 'aumsalah079',
+    gender: 'ذكر',
+    age: 30,
+    role: 'مالك',
+    joinDate: new Date().toISOString(),
+    interaction: 1000,
+    profilePic: 'default_male.png',
+    profileColor: '#FFD700',
+    serial: 1
+};
+
 app.use(express.static(path.join(__dirname, 'public')));
-
-// إعداد JSON للطلبات
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 
-// تخزين المستخدمين والرسائل
-const users = new Map();
-const messageHistory = [];
-
-// صفحة الرئيسية
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+// API لتسجيل الدخول
+app.post('/api/login', (req, res) => {
+    const { username, password } = req.body;
+    
+    if (userData[username] && userData[username].password === password) {
+        res.json({ 
+            success: true, 
+            user: {
+                username,
+                role: userData[username].role,
+                gender: userData[username].gender,
+                profilePic: userData[username].profilePic
+            }
+        });
+    } else {
+        res.json({ success: false, message: 'اسم المستخدم أو كلمة السر غير صحيحة' });
+    }
 });
 
-// صفحة الدردشة
-app.get('/chat', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'chat.html'));
-});
-
-// API للحصول على معلومات السيرفر
-app.get('/api/info', (req, res) => {
-  res.json({
-    status: 'online',
-    users: users.size,
-    messages: messageHistory.length,
-    uptime: process.uptime(),
-    timestamp: new Date().toISOString()
-  });
+// API للتسجيل
+app.post('/api/register', (req, res) => {
+    const { username, password, gender, age } = req.body;
+    
+    if (userData[username]) {
+        res.json({ success: false, message: 'اسم المستخدم موجود مسبقاً' });
+    } else if (username.length < 3) {
+        res.json({ success: false, message: 'اسم المستخدم يجب أن يكون 3 أحرف على الأقل' });
+    } else if (password.length < 4) {
+        res.json({ success: false, message: 'كلمة السر يجب أن تكون 4 أحرف على الأقل' });
+    } else {
+        // إنشاء رقم تسلسلي
+        const serial = Object.keys(userData).length + 1;
+        
+        userData[username] = {
+            password,
+            gender,
+            age: parseInt(age),
+            role: 'عضو',
+            joinDate: new Date().toISOString(),
+            interaction: 0,
+            profilePic: gender === 'أنثى' ? 'default_female.png' : 'default_male.png',
+            profileColor: gender === 'أنثى' ? '#FF69B4' : '#1E90FF',
+            serial,
+            friends: [],
+            friendRequests: [],
+            bio: 'مرحباً! أنا جديد هنا.',
+            status: 'نشط',
+            privateChatEnabled: true
+        };
+        
+        saveUserData();
+        res.json({ 
+            success: true, 
+            message: 'تم التسجيل بنجاح',
+            user: {
+                username,
+                role: 'عضو',
+                gender,
+                profilePic: userData[username].profilePic
+            }
+        });
+    }
 });
 
 // Socket.io Events
 io.on('connection', (socket) => {
-  console.log(`✅ مستخدم متصل: ${socket.id}`);
-  
-  // تعيين اسم افتراضي للمستخدم
-  const defaultUsername = `مستخدم_${socket.id.substring(0, 5)}`;
-  
-  // تخزين بيانات المستخدم
-  users.set(socket.id, {
-    id: socket.id,
-    username: defaultUsername,
-    joinedAt: new Date(),
-    lastActivity: new Date()
-  });
-  
-  // ترحيب بالمستخدم الجديد
-  socket.emit('welcome', {
-    message: `🎉 مرحباً بك في شاتي!`,
-    username: defaultUsername,
-    userId: socket.id,
-    onlineUsers: Array.from(users.values()).map(u => ({
-      id: u.id,
-      username: u.username
-    }))
-  });
-  
-  // إرسال سجل الرسائل للمستخدم الجديد
-  if (messageHistory.length > 0) {
-    socket.emit('message history', messageHistory.slice(-50)); // آخر 50 رسالة
-  }
-  
-  // إعلام الآخرين بمستخدم جديد
-  socket.broadcast.emit('user joined', {
-    username: defaultUsername,
-    userId: socket.id,
-    time: new Date().toLocaleTimeString(),
-    onlineCount: users.size
-  });
-  
-  // تحديث عدد المستخدمين للجميع
-  io.emit('users update', {
-    count: users.size,
-    users: Array.from(users.values()).map(u => u.username)
-  });
-  
-  // استقبال رسالة جديدة
-  socket.on('chat message', (data) => {
-    const user = users.get(socket.id);
-    if (!user || !data || !data.message) return;
-    
-    // تنظيف وتأمين الرسالة
-    const cleanMessage = data.message.toString().trim().substring(0, 1000);
-    if (!cleanMessage) return;
-    
-    // تحديث آخر نشاط
-    user.lastActivity = new Date();
-    
-    // إنشاء كائن الرسالة
-    const messageObj = {
-      id: Date.now() + socket.id,
-      userId: socket.id,
-      username: user.username,
-      message: cleanMessage,
-      timestamp: new Date().toLocaleTimeString(),
-      fullTime: new Date().toLocaleString(),
-      type: 'message'
-    };
-    
-    // حفظ في السجل (الحد الأقصى 1000 رسالة)
-    messageHistory.push(messageObj);
-    if (messageHistory.length > 1000) {
-      messageHistory.shift();
-    }
-    
-    console.log(`💬 ${user.username}: ${cleanMessage}`);
-    
-    // إرسال للجميع
-    io.emit('chat message', messageObj);
-  });
-  
-  // تغيير اسم المستخدم
-  socket.on('change username', (newUsername) => {
-    const user = users.get(socket.id);
-    if (!user || !newUsername || newUsername.trim().length < 2) return;
-    
-    const cleanUsername = newUsername.toString().trim().substring(0, 20);
-    const oldUsername = user.username;
-    user.username = cleanUsername;
-    
-    io.emit('username changed', {
-      userId: socket.id,
-      oldUsername: oldUsername,
-      newUsername: cleanUsername,
-      time: new Date().toLocaleTimeString()
+    console.log('مستخدم جديد متصل:', socket.id);
+
+    socket.on('join', (userData) => {
+        users[socket.id] = {
+            id: socket.id,
+            username: userData.username,
+            role: userData.role,
+            gender: userData.gender,
+            profilePic: userData.profilePic,
+            room: 'general',
+            isGuest: userData.isGuest || false
+        };
+
+        socket.join('general');
+        io.emit('user joined', users[socket.id]);
+        io.emit('update users', Object.values(users));
     });
-  });
-  
-  // طلب معلومات المستخدم
-  socket.on('get user info', () => {
-    const user = users.get(socket.id);
-    if (user) {
-      socket.emit('user info', {
-        id: user.id,
-        username: user.username,
-        joinedAt: user.joinedAt.toLocaleString(),
-        connectionTime: Math.floor((new Date() - user.joinedAt) / 1000)
-      });
-    }
-  });
-  
-  // إرسال رسالة خاصة (PM)
-  socket.on('private message', (data) => {
-    if (!data.to || !data.message) return;
-    
-    const sender = users.get(socket.id);
-    const receiverSocket = Array.from(users.keys())
-      .find(id => users.get(id).username === data.to);
-    
-    if (receiverSocket && sender) {
-      io.to(receiverSocket).emit('private message', {
-        from: sender.username,
-        message: data.message,
-        timestamp: new Date().toLocaleTimeString()
-      });
-      
-      socket.emit('private message sent', {
-        to: data.to,
-        message: data.message
-      });
-    }
-  });
-  
-  // ping/pong للحفاظ على الاتصال
-  socket.on('ping', () => {
-    socket.emit('pong', { timestamp: Date.now() });
-  });
-  
-  // فصل المستخدم
-  socket.on('disconnect', (reason) => {
-    const user = users.get(socket.id);
-    console.log(`❌ مستخدم انقطع: ${socket.id} - السبب: ${reason}`);
-    
-    if (user) {
-      // إعلام الآخرين
-      socket.broadcast.emit('user left', {
-        username: user.username,
-        userId: socket.id,
-        time: new Date().toLocaleTimeString(),
-        onlineCount: users.size - 1
-      });
-      
-      // حذف من القائمة
-      users.delete(socket.id);
-      
-      // تحديث عدد المستخدمين
-      io.emit('users update', {
-        count: users.size,
-        users: Array.from(users.values()).map(u => u.username)
-      });
-    }
-  });
-  
-  // معالجة الأخطاء
-  socket.on('error', (error) => {
-    console.error(`❌ خطأ في السوكت ${socket.id}:`, error);
-  });
+
+    socket.on('send message', (data) => {
+        const user = users[socket.id];
+        if (!user) return;
+
+        const message = {
+            id: Date.now(),
+            username: user.username,
+            role: user.role,
+            gender: user.gender,
+            profilePic: user.profilePic,
+            text: data.text,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            room: data.room || 'general'
+        };
+
+        // زيادة التفاعل للمستخدم
+        if (!user.isGuest && data.text.length >= 4) {
+            userData[user.username].interaction += 1;
+            saveUserData();
+        }
+
+        if (!messages[message.room]) messages[message.room] = [];
+        messages[message.room].push(message);
+
+        io.to(message.room).emit('receive message', message);
+    });
+
+    socket.on('typing', (data) => {
+        const user = users[socket.id];
+        if (user) {
+            socket.broadcast.to(data.room || 'general').emit('user typing', {
+                username: user.username,
+                isTyping: data.isTyping
+            });
+        }
+    });
+
+    socket.on('disconnect', () => {
+        const user = users[socket.id];
+        if (user) {
+            io.emit('user left', user.username);
+            delete users[socket.id];
+            io.emit('update users', Object.values(users));
+        }
+    });
 });
 
-// تشغيل السيرفر
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log('='.repeat(50));
-  console.log(`🚀 السيرفر يعمل على: http://localhost:${PORT}`);
-  console.log(`📁 الملفات الثابتة من: ${path.join(__dirname, 'public')}`);
-  console.log(`⏰ الوقت: ${new Date().toLocaleString()}`);
-  console.log('='.repeat(50));
+    console.log(`الخادم يعمل على المنفذ ${PORT}`);
 });
