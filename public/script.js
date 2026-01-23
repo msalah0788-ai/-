@@ -442,7 +442,7 @@ async function handleMemberLogin() {
       addToRecentUsers(userData);
       
       // الانتقال للشات
-      window.location.href = 'chat.html';
+window.location.href = '/chat';
       return;
     }
     
@@ -623,10 +623,10 @@ async function handleRegister() {
     // إظهار تأثير الدخول
     showLoginEffect('عضو');
     
-    // الانتقال للشات
-    setTimeout(() => {
-      window.location.href = 'chat.html';
-    }, 1500);
+   // الانتقال للشات
+setTimeout(() => {
+  window.location.href = '/chat';
+}, 1500);
     
   } catch (error) {
     console.error('خطأ في إنشاء الحساب:', error);
@@ -732,10 +732,10 @@ async function handleGuestLogin() {
     // إظهار رسالة النجاح
     showNotification('تم تسجيل دخولك كزائر', 'success');
     
-    // الانتقال للشات
-    setTimeout(() => {
-      window.location.href = 'chat.html';
-    }, 1000);
+   // الانتقال للشات
+setTimeout(() => {
+  window.location.href = '/chat';
+}, 1000);
     
   } catch (error) {
     console.error('خطأ في تسجيل الزائر:', error);
