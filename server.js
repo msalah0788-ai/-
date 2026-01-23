@@ -240,25 +240,7 @@ app.get('/', (req, res) => {
 app.get('/chat', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'chat.html'));
 });
-  // التحقق من وجود توكن في query string
-  const token = req.query.token;
-  
-  if (!token) {
-    // إذا ما في توكن، ارجع لصفحة تسجيل الدخول
-    return res.redirect('/');
-  }
-  
-  // التحقق من صحة التوكن
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    
-    // إذا التوكن صالح، ارسل صفحة الشات
-    res.sendFile(path.join(__dirname, 'public', 'chat.html'));
-  } catch (err) {
-    // إذا التوكن غير صالح، ارجع لصفحة تسجيل الدخول
-    res.redirect('/');
-  }
-});
+ 
 
 // API لتحميل بيانات المستخدم للشات
 app.get('/api/chat-data', authenticateToken, (req, res) => {
