@@ -330,7 +330,7 @@ app.post('/api/login', async (req, res) => {
                     user = new User({
                         serialNumber: 1,
                         username: 'محمد',
-                        password: 'محمد'، // هون بتشفرها بعدين
+                      password: 'محمد', // هون بتشفرها بعدين
                         gender: 'male',
                         role: 'owner'
                     });
